@@ -1,5 +1,6 @@
 add_executable(raypalette_unit_tests
     color_test.cpp
+    geometry_test.cpp
     polar_test.cpp
     vec3_test.cpp
 )
