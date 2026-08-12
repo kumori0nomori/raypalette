@@ -14,6 +14,11 @@ RAYPALETTE_HOST_DEVICE inline bool is_unit_color(const Vec3 &color) {
          color.z <= 1.0f;
 }
 
+RAYPALETTE_HOST_DEVICE inline bool is_nonnegative_color(const Vec3 &color) {
+  return is_finite(color) && color.x >= 0.0f && color.y >= 0.0f &&
+         color.z >= 0.0f;
+}
+
 RAYPALETTE_HOST_DEVICE inline float srgb_to_linear_component(float value) {
   const float clamped = clamp_unit(value);
   return clamped <= 0.04045f 

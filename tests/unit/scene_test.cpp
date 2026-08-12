@@ -30,30 +30,86 @@ TEST(Material, RejectsInvalidPhysicalParameters) {
   EXPECT_FALSE(is_valid_material(invalid_emission));
 }
 
-TEST(PointLight, ConvertsPolarPositionAroundSphereCenter) {
+TEST(Light, ConvertsPointLightPolarPositionAroundSphereCenter) {
   const Vec3 sphere_center{0.0f, 1.0f, 0.0f};
-  const PointLight light = point_light_from_polar({2.0f, 0.0f, 0.0f},
-                                                   sphere_center,
-                                                   {1.0f, 0.5f, 0.25f}, 50.0f);
+  const Light light = make_point_light({2.0f, 0.0f, 0.0f}, sphere_center,
+                                       {1.0f, 0.5f, 0.25f}, 50.0f);
 
+  EXPECT_EQ(light.type, LightType::Point);
   EXPECT_NEAR(light.position.x, 0.0f, 1.0e-6f);
   EXPECT_NEAR(light.position.y, 3.0f, 1.0e-6f);
   EXPECT_NEAR(light.position.z, 0.0f, 1.0e-6f);
-  EXPECT_TRUE(is_valid_point_light(light));
+  EXPECT_TRUE(is_valid_light(light));
 }
 
-TEST(PointLight, RejectsInvalidColorAndIntensity) {
-  PointLight invalid_color;
+TEST(Light, RejectsInvalidColorAndIntensity) {
+  Light invalid_color;
   invalid_color.color = {-0.1f, 1.0f, 1.0f};
-  EXPECT_FALSE(is_valid_point_light(invalid_color));
+  EXPECT_FALSE(is_valid_light(invalid_color));
 
-  PointLight invalid_intensity;
+  Light invalid_intensity;
   invalid_intensity.intensity = -1.0f;
-  EXPECT_FALSE(is_valid_point_light(invalid_intensity));
+  EXPECT_FALSE(is_valid_light(invalid_intensity));
 
-  PointLight invalid_position;
+  Light invalid_position;
   invalid_position.position.x = std::numeric_limits<float>::infinity();
-  EXPECT_FALSE(is_valid_point_light(invalid_position));
+  EXPECT_FALSE(is_valid_light(invalid_position));
+}
+
+TEST(Light, SamplesPointLightDirectionAndInverseSquareRadiance) {
+  Light light;
+  light.position = {0.0f, 4.0f, 0.0f};
+  light.color = {1.0f, 0.5f, 0.25f};
+  light.intensity = 16.0f;
+  LightSample near_sample;
+  LightSample far_sample;
+
+  ASSERT_TRUE(sample_light(light, {0.0f, 2.0f, 0.0f}, near_sample));
+  ASSERT_TRUE(sample_light(light, {0.0f, 0.0f, 0.0f}, far_sample));
+
+  EXPECT_FLOAT_EQ(near_sample.direction_to_light.x, 0.0f);
+  EXPECT_FLOAT_EQ(near_sample.direction_to_light.y, 1.0f);
+  EXPECT_FLOAT_EQ(near_sample.distance, 2.0f);
+  EXPECT_FLOAT_EQ(near_sample.radiance.x, 4.0f);
+  EXPECT_FLOAT_EQ(near_sample.radiance.y, 2.0f);
+  EXPECT_NEAR(far_sample.radiance.x, near_sample.radiance.x * 0.25f, 1.0e-6f);
+}
+
+TEST(Light, RejectsSurfaceAtPointLightPosition) {
+  Light light;
+  light.position = {1.0f, 2.0f, 3.0f};
+  LightSample sample;
+
+  EXPECT_FALSE(sample_light(light, light.position, sample));
+}
+
+TEST(Light, CreatesDirectionalLightFromPolarDirection) {
+  const Light light = make_directional_light(90.0f, 0.0f, {1.0f, 0.5f, 0.25f},
+                                             3.0f);
+  LightSample sample;
+
+  ASSERT_TRUE(sample_light(light, {12.0f, -3.0f, 8.0f}, sample));
+  EXPECT_EQ(light.type, LightType::Directional);
+  EXPECT_NEAR(length(light.direction_to_light), 1.0f, 1.0e-6f);
+  EXPECT_NEAR(sample.direction_to_light.x, 1.0f, 1.0e-6f);
+  EXPECT_NEAR(sample.direction_to_light.y, 0.0f, 1.0e-6f);
+  EXPECT_NEAR(sample.radiance.x, 3.0f, 1.0e-6f);
+  EXPECT_GT(sample.distance, 1.0e20f);
+}
+
+TEST(Light, ValidatesRectAreaParametersWithoutSampling) {
+  const Light light = make_rect_area_light({3.0f, 45.0f, 0.0f}, {0.0f, 1.0f, 0.0f},
+                                           {0.0f, -1.0f, 0.0f}, 2.0f, 1.0f,
+                                           {1.0f, 1.0f, 1.0f}, 5.0f);
+  LightSample sample;
+
+  EXPECT_EQ(light.type, LightType::RectArea);
+  EXPECT_TRUE(is_valid_light(light));
+  EXPECT_FALSE(sample_light(light, {}, sample));
+
+  Light invalid_light = light;
+  invalid_light.width = 0.0f;
+  EXPECT_FALSE(is_valid_light(invalid_light));
 }
 
 TEST(Scene, CreatesCanonicalSphereAndFloor) {
@@ -68,7 +124,21 @@ TEST(Scene, CreatesCanonicalSphereAndFloor) {
   EXPECT_EQ(scene.floor.material_index, kFloorMaterialIndex);
   EXPECT_TRUE(is_valid_material(scene.materials[kSphereMaterialIndex]));
   EXPECT_TRUE(is_valid_material(scene.materials[kFloorMaterialIndex]));
-  EXPECT_TRUE(is_valid_point_light(scene.point_light));
+  EXPECT_EQ(scene.light.type, LightType::Point);
+  EXPECT_TRUE(is_valid_light(scene.light));
+  EXPECT_TRUE(is_valid_scene(scene));
+}
+
+TEST(Scene, AllowsHdrDisplayBackgroundButRejectsInvalidValues) {
+  Scene scene = make_default_scene();
+  scene.background_color = {2.0f, 0.5f, 0.0f};
+  EXPECT_TRUE(is_valid_scene(scene));
+
+  scene.background_color = {-0.01f, 0.0f, 0.0f};
+  EXPECT_FALSE(is_valid_scene(scene));
+
+  scene.background_color.x = std::numeric_limits<float>::infinity();
+  EXPECT_FALSE(is_valid_scene(scene));
 }
 
 } // namespace
