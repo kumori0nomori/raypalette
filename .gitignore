@@ -1,0 +1,9 @@
+/build/
+/out/
+/.cache/
+/.vs/
+/.vscode/ipch/
+compile_commands.json
+*.user
+*.suo
+*.nvcvlog

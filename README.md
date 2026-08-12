@@ -1,0 +1,96 @@
+# RayPalette
+
+RayPalette は、制御した照明下でイラストの色がどのように変化するかを
+検討するための軽量な CUDA レンダラーです。固定した球と床のシーンを、
+ネイティブ GUI で対話的に調整できるようにします。
+
+## 1. 前提条件
+
+### 1.1. 共通
+
+- CMake 3.24 以降
+- C++17 コンパイラ
+- NVIDIA CUDA Toolkit 12.8 以降（RTX 50 シリーズ / `sm_120`）
+
+### 1.2. Ubuntu 24.04（確認済み）
+
+- GCC 13.3
+- NVIDIA CUDA Toolkit 12.8.93
+- 将来の GLFW/OpenGL GUI 用 X11・OpenGL 開発パッケージ
+
+Ubuntu で GLFW/OpenGL GUI をビルドする場合は、X11 と OpenGL の開発パッケージを
+インストールしてください。
+
+```sh
+sudo apt install libgl1-mesa-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
+```
+
+### 1.3. Windows 11（対応予定）
+
+- Visual Studio Community 2022 または Build Tools 2022
+- 「C++ によるデスクトップ開発」ワークロード、MSVC v143、Windows SDK
+- NVIDIA CUDA Toolkit 12.8 以降
+- OpenGL / GLFW の開発環境: TBD（Windows 実機で未検証）
+
+## 2. 構成とビルド
+
+初期の bootstrap ターゲットはネットワーク依存を持ちません。
+
+### 2.1. Ubuntu 24.04（確認済み）
+
+Debug ビルドは次のコマンドで構成、ビルド、テストを実行できます。
+
+```sh
+cmake --preset linux-debug
+cmake --build --preset linux-debug
+ctest --preset linux-debug
+```
+
+Release ビルドでは `linux-release` を使用します。
+
+```sh
+cmake --preset linux-release
+cmake --build --preset linux-release
+ctest --preset linux-release
+```
+
+Debug の bootstrap 実行ファイルは次のように起動します。
+
+```sh
+./build/linux-debug/raypalette
+```
+
+### 2.2. Windows 11（未検証）
+
+Visual Studio 2022 の「Developer PowerShell for VS 2022」または同等の開発者用
+コマンドプロンプトで、Debug ビルドを実行します。
+
+```powershell
+cmake --preset windows-debug
+cmake --build --preset windows-debug
+ctest --preset windows-debug
+```
+
+Release ビルドでは `windows-release` を使用します。
+
+```powershell
+cmake --preset windows-release
+cmake --build --preset windows-release
+ctest --preset windows-release
+```
+
+Visual Studio generator では構成別サブディレクトリが作られるため、Debug の
+bootstrap 実行ファイルは次のパスになります。
+
+```powershell
+.\build\windows-debug\Debug\raypalette.exe
+```
+
+## 3. 依存ライブラリ
+
+Dear ImGui、GLFW、GoogleTest は、CMake の `FetchContent` を通じて
+`cmake/Dependencies.cmake` に不変の上流コミット SHA で定義しています。
+実装済みターゲットで `RAYPALETTE_FETCH_DEPENDENCIES=ON` を有効にした場合にのみ
+ダウンロードされます。初回のダウンロードにはネットワーク接続が必要ですが、
+以降は CMake がビルドツリー内に展開したキャッシュを再利用します。Ubuntu では、
+先に上記の GUI 用パッケージをインストールしてから有効にしてください。
