@@ -60,6 +60,16 @@ Debug の bootstrap 実行ファイルは次のように起動します。
 ./build/linux-debug/raypalette
 ```
 
+GUI をビルドする場合は、Ubuntu の X11/OpenGL 開発パッケージをインストールした
+うえで、GUI 用 preset を使用します。初回の構成では FetchContent による依存ライブラリ
+のダウンロードが発生します。
+
+```sh
+cmake --preset linux-gui-debug
+cmake --build --preset linux-gui-debug
+./build/linux-gui-debug/raypalette_gui
+```
+
 ### 2.2. Windows 11（未検証）
 
 Visual Studio 2022 の「Developer PowerShell for VS 2022」または同等の開発者用
@@ -84,6 +94,15 @@ bootstrap 実行ファイルは次のパスになります。
 
 ```powershell
 .\build\windows-debug\Debug\raypalette.exe
+```
+
+GUI は Windows 用 preset で構成・ビルドします。Visual Studio 2022 の Developer
+PowerShell から実行してください。
+
+```powershell
+cmake --preset windows-gui-debug
+cmake --build --preset windows-gui-debug
+.\build\windows-gui-debug\Debug\raypalette_gui.exe
 ```
 
 ## 3. テスト

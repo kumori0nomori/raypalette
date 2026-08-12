@@ -58,13 +58,40 @@ target_include_directories(raypalette_cuda_compile_check PRIVATE ${PROJECT_SOURC
 
 if(RAYPALETTE_FETCH_DEPENDENCIES)
     include(cmake/Dependencies.cmake)
-    raypalette_fetch_gui_dependencies()
+    if(RAYPALETTE_BUILD_GUI)
+        raypalette_fetch_gui_dependencies()
+    endif()
 endif()
 
 if(RAYPALETTE_BUILD_GUI)
-    message(FATAL_ERROR
-        "The GUI target has not been implemented yet. Configure with "
-        "-DRAYPALETTE_BUILD_GUI=OFF.")
+    if(NOT RAYPALETTE_FETCH_DEPENDENCIES)
+        message(FATAL_ERROR "RAYPALETTE_BUILD_GUI requires RAYPALETTE_FETCH_DEPENDENCIES=ON.")
+    endif()
+
+    add_library(raypalette_imgui STATIC
+        ${RAYPALETTE_IMGUI_SOURCE_DIR}/imgui.cpp
+        ${RAYPALETTE_IMGUI_SOURCE_DIR}/imgui_draw.cpp
+        ${RAYPALETTE_IMGUI_SOURCE_DIR}/imgui_tables.cpp
+        ${RAYPALETTE_IMGUI_SOURCE_DIR}/imgui_widgets.cpp
+        ${RAYPALETTE_IMGUI_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
+        ${RAYPALETTE_IMGUI_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
+    )
+    target_include_directories(raypalette_imgui PUBLIC
+        ${RAYPALETTE_IMGUI_SOURCE_DIR}
+        ${RAYPALETTE_IMGUI_SOURCE_DIR}/backends
+    )
+    target_link_libraries(raypalette_imgui PUBLIC glfw)
+
+    find_package(OpenGL REQUIRED)
+    add_executable(raypalette_gui
+        src/app/application.cpp
+    )
+    target_include_directories(raypalette_gui PRIVATE ${PROJECT_SOURCE_DIR}/src)
+    target_link_libraries(raypalette_gui PRIVATE
+        raypalette_renderer
+        raypalette_imgui
+        OpenGL::GL
+    )
 endif()
 
 message(STATUS "RayPalette CUDA target architecture: sm_${CMAKE_CUDA_ARCHITECTURES}")

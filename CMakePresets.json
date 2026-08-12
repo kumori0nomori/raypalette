@@ -27,12 +27,32 @@
       }
     },
     {
+      "name": "linux-gui-debug",
+      "displayName": "Linux GUI Debug",
+      "inherits": "linux-debug",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "RAYPALETTE_BUILD_GUI": "ON",
+        "RAYPALETTE_FETCH_DEPENDENCIES": "ON"
+      }
+    },
+    {
       "name": "linux-release",
       "displayName": "Linux Release",
       "inherits": "base",
       "generator": "Unix Makefiles",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "linux-gui-release",
+      "displayName": "Linux GUI Release",
+      "inherits": "linux-release",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "RAYPALETTE_BUILD_GUI": "ON",
+        "RAYPALETTE_FETCH_DEPENDENCIES": "ON"
       }
     },
     {
@@ -51,6 +71,16 @@
       }
     },
     {
+      "name": "windows-gui-debug",
+      "displayName": "Windows GUI Debug",
+      "inherits": "windows-debug",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "RAYPALETTE_BUILD_GUI": "ON",
+        "RAYPALETTE_FETCH_DEPENDENCIES": "ON"
+      }
+    },
+    {
       "name": "windows-release",
       "displayName": "Windows Release",
       "inherits": "base",
@@ -64,6 +94,16 @@
         "lhs": "${hostSystemName}",
         "rhs": "Windows"
       }
+    },
+    {
+      "name": "windows-gui-release",
+      "displayName": "Windows GUI Release",
+      "inherits": "windows-release",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "RAYPALETTE_BUILD_GUI": "ON",
+        "RAYPALETTE_FETCH_DEPENDENCIES": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -73,8 +113,18 @@
       "configuration": "Debug"
     },
     {
+      "name": "linux-gui-debug",
+      "configurePreset": "linux-gui-debug",
+      "configuration": "Debug"
+    },
+    {
       "name": "linux-release",
       "configurePreset": "linux-release",
+      "configuration": "Release"
+    },
+    {
+      "name": "linux-gui-release",
+      "configurePreset": "linux-gui-release",
       "configuration": "Release"
     },
     {
@@ -83,8 +133,18 @@
       "configuration": "Debug"
     },
     {
+      "name": "windows-gui-debug",
+      "configurePreset": "windows-gui-debug",
+      "configuration": "Debug"
+    },
+    {
       "name": "windows-release",
       "configurePreset": "windows-release",
+      "configuration": "Release"
+    },
+    {
+      "name": "windows-gui-release",
+      "configurePreset": "windows-gui-release",
       "configuration": "Release"
     }
   ],
@@ -92,6 +152,14 @@
     {
       "name": "linux-debug",
       "configurePreset": "linux-debug",
+      "configuration": "Debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "linux-gui-debug",
+      "configurePreset": "linux-gui-debug",
       "configuration": "Debug",
       "output": {
         "outputOnFailure": true
@@ -106,6 +174,14 @@
       }
     },
     {
+      "name": "linux-gui-release",
+      "configurePreset": "linux-gui-release",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
       "name": "windows-debug",
       "configurePreset": "windows-debug",
       "configuration": "Debug",
@@ -114,8 +190,24 @@
       }
     },
     {
+      "name": "windows-gui-debug",
+      "configurePreset": "windows-gui-debug",
+      "configuration": "Debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
       "name": "windows-release",
       "configurePreset": "windows-release",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "windows-gui-release",
+      "configurePreset": "windows-gui-release",
       "configuration": "Release",
       "output": {
         "outputOnFailure": true
