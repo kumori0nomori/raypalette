@@ -32,6 +32,11 @@ add_executable(raypalette
     src/app/main.cpp
 )
 
+add_library(raypalette_renderer STATIC
+    src/render/renderer.cu
+)
+target_include_directories(raypalette_renderer PUBLIC ${PROJECT_SOURCE_DIR}/src)
+
 target_compile_features(raypalette PRIVATE cxx_std_17)
 
 if(MSVC)
