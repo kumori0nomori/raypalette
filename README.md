@@ -86,7 +86,46 @@ bootstrap 実行ファイルは次のパスになります。
 .\build\windows-debug\Debug\raypalette.exe
 ```
 
-## 3. 依存ライブラリ
+## 3. テスト
+
+テストは CTest に登録されています。構成とビルドを完了した後、次のコマンドで
+すべてのテストを実行します。
+
+### 3.1. Ubuntu 24.04（確認済み）
+
+```sh
+ctest --preset linux-debug --output-on-failure
+```
+
+Release ビルドでは `linux-release` を使用します。
+
+```sh
+ctest --preset linux-release --output-on-failure
+```
+
+特定のテスト群だけを実行する場合は、`-R` に正規表現を指定します。
+
+```sh
+ctest --preset linux-debug -R Vec3 --output-on-failure
+```
+
+現在は、ベクトル・色・極座標の GoogleTest unit test と、共有数学ヘッダを
+`nvcc` で検査する CUDA コンパイルチェックを実行します。CUDA コンパイルチェックは
+ビルド時に実行され、CTest のテスト一覧には含まれません。
+
+### 3.2. Windows 11（未検証）
+
+```powershell
+ctest --preset windows-debug --output-on-failure
+```
+
+Release ビルドでは `windows-release` を使用します。
+
+```powershell
+ctest --preset windows-release --output-on-failure
+```
+
+## 4. 依存ライブラリ
 
 Dear ImGui、GLFW、GoogleTest は、CMake の `FetchContent` を通じて
 `cmake/Dependencies.cmake` に不変の上流コミット SHA で定義しています。

@@ -40,9 +40,20 @@ else()
     target_compile_options(raypalette PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
+if(BUILD_TESTING)
+    include(cmake/Dependencies.cmake)
+    raypalette_fetch_test_dependencies()
+    add_subdirectory(tests)
+endif()
+
+add_library(raypalette_cuda_compile_check OBJECT
+    tests/cuda/math_compile_check.cu
+)
+target_include_directories(raypalette_cuda_compile_check PRIVATE ${PROJECT_SOURCE_DIR}/src)
+
 if(RAYPALETTE_FETCH_DEPENDENCIES)
     include(cmake/Dependencies.cmake)
-    raypalette_fetch_dependencies()
+    raypalette_fetch_gui_dependencies()
 endif()
 
 if(RAYPALETTE_BUILD_GUI)

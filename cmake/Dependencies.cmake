@@ -1,17 +1,23 @@
 include(FetchContent)
 
-function(raypalette_fetch_dependencies)
-    FetchContent_Declare(
-        glfw
-        GIT_REPOSITORY https://github.com/glfw/glfw.git
-        GIT_TAG a74efa0d5628b74adc0426af4c5710e287fa7c2c
-        GIT_SHALLOW TRUE
-    )
-
+function(raypalette_fetch_test_dependencies)
     FetchContent_Declare(
         googletest
         GIT_REPOSITORY https://github.com/google/googletest.git
         GIT_TAG f8d7d77c06936315286eb55f8de22cd23c188571
+        GIT_SHALLOW TRUE
+    )
+
+    set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+
+    FetchContent_MakeAvailable(googletest)
+endfunction()
+
+function(raypalette_fetch_gui_dependencies)
+    FetchContent_Declare(
+        glfw
+        GIT_REPOSITORY https://github.com/glfw/glfw.git
+        GIT_TAG a74efa0d5628b74adc0426af4c5710e287fa7c2c
         GIT_SHALLOW TRUE
     )
 
@@ -26,7 +32,5 @@ function(raypalette_fetch_dependencies)
     set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
     set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
     set(GLFW_BUILD_WAYLAND OFF CACHE BOOL "" FORCE)
-    set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
-
-    FetchContent_MakeAvailable(glfw googletest imgui)
+    FetchContent_MakeAvailable(glfw imgui)
 endfunction()
