@@ -28,6 +28,11 @@ struct GuiLayout {
 
 constexpr GuiLayout kDefaultGuiLayout{};
 
+struct DisplaySettings {
+  float exposure_ev = 0.0f;
+  bool use_reinhard = true;
+};
+
 struct Texture {
   GLuint id = 0;
   int width = 0;
@@ -49,14 +54,17 @@ struct Texture {
                  nullptr);
   }
 
-  void upload(const raypalette::Image &image) {
+  void upload(const raypalette::Image &image,
+              const DisplaySettings &display_settings) {
     if (image.width != width || image.height != height) {
       create(image.width, image.height);
     }
     // Convert linear color to sRGB for display.
     display_pixels.resize(image.pixels.size());
     for (std::size_t index = 0; index < image.pixels.size(); ++index) {
-      display_pixels[index] = raypalette::linear_to_srgb(image.pixels[index]);
+      display_pixels[index] = raypalette::prepare_for_display(
+          image.pixels[index], display_settings.exposure_ev,
+          display_settings.use_reinhard);
     }
     glBindTexture(GL_TEXTURE_2D, id);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image.width, image.height, GL_RGB,
@@ -145,11 +153,13 @@ int main() {
   raypalette::PolarCoordinates light_polar{4.0f, 35.0f, 45.0f};
   int light_type_index = static_cast<int>(scene.light.type);
   raypalette::RenderSettings settings{512, 512, 0.001f, 4, 64};
+  DisplaySettings display_settings;
   raypalette::Camera camera = raypalette::make_default_camera(1.0f);
   raypalette::Renderer renderer;
   Texture texture;
   raypalette::Image image;
   bool needs_render = true;
+  bool needs_display_update = true;
   auto request_render = [&]() {
     renderer.reset_accumulation();
     needs_render = true;
@@ -185,9 +195,9 @@ int main() {
       request_render();
     }
     if (ImGui::ColorEdit3(
-        "Sphere emission",
-        &scene.materials[raypalette::kSphereMaterialIndex].emission_color.x,
-        ImGuiColorEditFlags_Float)) {
+          "Sphere emission",
+          &scene.materials[raypalette::kSphereMaterialIndex].emission_color.x,
+          ImGuiColorEditFlags_Float)) {
       scene.materials[raypalette::kSphereMaterialIndex].emission_color.x =
         std::max(0.0f, scene.materials[raypalette::kSphereMaterialIndex]
                    .emission_color.x);
@@ -211,6 +221,14 @@ int main() {
       scene.background_color.y = std::max(0.0f, scene.background_color.y);
       scene.background_color.z = std::max(0.0f, scene.background_color.z);
       request_render();
+    }
+    if (ImGui::SliderFloat("Exposure (EV)", &display_settings.exposure_ev,
+                           -4.0f, 4.0f)) {
+      needs_display_update = true;
+    }
+    if (ImGui::Checkbox("Reinhard tone mapping",
+                        &display_settings.use_reinhard)) {
+      needs_display_update = true;
     }
     if (ImGui::ColorEdit3("Environment color", &scene.environment.color.x,
                           ImGuiColorEditFlags_Float)) {
@@ -310,8 +328,12 @@ int main() {
 
     if (needs_render) {
       image = renderer.render(scene, camera, settings);
-      texture.upload(image);
+      texture.upload(image, display_settings);
       needs_render = !renderer.is_accumulation_complete(settings);
+      needs_display_update = false;
+    } else if (needs_display_update) {
+      texture.upload(image, display_settings);
+      needs_display_update = false;
     }
 
     ImGui::SetNextWindowSize(

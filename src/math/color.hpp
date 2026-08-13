@@ -50,4 +50,18 @@ RAYPALETTE_HOST_DEVICE inline Vec3 apply_exposure(const Vec3 &color,
   return color * exp2f(exposure_stops);
 }
 
+RAYPALETTE_HOST_DEVICE inline Vec3 reinhard_tonemap(const Vec3 &color) {
+  return {color.x / (1.0f + color.x), color.y / (1.0f + color.y),
+          color.z / (1.0f + color.z)};
+}
+
+RAYPALETTE_HOST_DEVICE inline Vec3 prepare_for_display(
+    const Vec3 &linear_color, float exposure_stops, bool use_reinhard) {
+  Vec3 exposed = apply_exposure(linear_color, exposure_stops);
+  if (use_reinhard) {
+    exposed = reinhard_tonemap(exposed);
+  }
+  return linear_to_srgb(exposed);
+}
+
 } // namespace raypalette

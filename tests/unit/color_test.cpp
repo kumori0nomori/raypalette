@@ -35,5 +35,21 @@ TEST(Color, AppliesExposureInLinearSpace) {
   EXPECT_FLOAT_EQ(darker.z, 0.5f);
 }
 
+TEST(Color, CompressesHdrValuesWithReinhardToneMapping) {
+  const Vec3 mapped = reinhard_tonemap({0.0f, 1.0f, 9.0f});
+
+  EXPECT_FLOAT_EQ(mapped.x, 0.0f);
+  EXPECT_FLOAT_EQ(mapped.y, 0.5f);
+  EXPECT_FLOAT_EQ(mapped.z, 0.9f);
+}
+
+TEST(Color, PreparesHdrColorForDisplay) {
+  const Vec3 display = prepare_for_display({0.0f, 1.0f, 9.0f}, 0.0f, true);
+
+  EXPECT_FLOAT_EQ(display.x, 0.0f);
+  EXPECT_NEAR(display.y, 0.73535698f, 1.0e-6f);
+  EXPECT_NEAR(display.z, 0.9546872f, 1.0e-6f);
+}
+
 } // namespace
 } // namespace raypalette
