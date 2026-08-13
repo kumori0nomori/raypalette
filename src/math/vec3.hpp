@@ -67,6 +67,10 @@ RAYPALETTE_HOST_DEVICE constexpr Vec3 operator*(const Vec3 &left,
   return {left.x * right.x, left.y * right.y, left.z * right.z};
 }
 
+RAYPALETTE_HOST_DEVICE constexpr Vec3 operator/(Vec3 value, float scalar) {
+  return value * (1.0f / scalar);
+}
+
 RAYPALETTE_HOST_DEVICE constexpr float dot(const Vec3 &left, const Vec3 &right) {
   return left.x * right.x + left.y * right.y + left.z * right.z;
 }

@@ -68,5 +68,22 @@ TEST(CudaRenderer, SupportsDeterministicSupersampling) {
   }
 }
 
+TEST(CudaRenderer, AccumulatesProgressiveFrames) {
+  if (!has_cuda_device()) {
+    GTEST_SKIP() << "No CUDA-capable device is available";
+  }
+  Renderer renderer;
+  RenderSettings settings{8, 8, 0.001f, 2, 4};
+  const Scene scene = make_default_scene();
+  const Camera camera = make_default_camera(1.0f);
+
+  renderer.render(scene, camera, settings);
+  EXPECT_EQ(renderer.accumulated_samples(), 2);
+  EXPECT_FALSE(renderer.is_accumulation_complete(settings));
+  renderer.render(scene, camera, settings);
+  EXPECT_EQ(renderer.accumulated_samples(), 4);
+  EXPECT_TRUE(renderer.is_accumulation_complete(settings));
+}
+
 } // namespace
 } // namespace raypalette

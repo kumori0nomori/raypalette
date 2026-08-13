@@ -144,12 +144,16 @@ int main() {
   raypalette::Scene scene = raypalette::make_default_scene();
   raypalette::PolarCoordinates light_polar{4.0f, 35.0f, 45.0f};
   int light_type_index = static_cast<int>(scene.light.type);
-  raypalette::RenderSettings settings{512, 512, 0.001f, 4};
+  raypalette::RenderSettings settings{512, 512, 0.001f, 4, 64};
   raypalette::Camera camera = raypalette::make_default_camera(1.0f);
   raypalette::Renderer renderer;
   Texture texture;
   raypalette::Image image;
   bool needs_render = true;
+  auto request_render = [&]() {
+    renderer.reset_accumulation();
+    needs_render = true;
+  };
 
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
@@ -166,37 +170,37 @@ int main() {
       scene = raypalette::make_default_scene();
       light_polar = {4.0f, 35.0f, 45.0f};
       light_type_index = static_cast<int>(scene.light.type);
-      needs_render = true;
+      request_render();
     }
     if (ImGui::ColorEdit3(
           "Sphere color",
           &scene.materials[raypalette::kSphereMaterialIndex].base_color.x,
           ImGuiColorEditFlags_Float)) {
-      needs_render = true;
+      request_render();
     }
     if (ImGui::ColorEdit3(
           "Floor color",
           &scene.materials[raypalette::kFloorMaterialIndex].base_color.x,
           ImGuiColorEditFlags_Float)) {
-      needs_render = true;
+      request_render();
     }
     if (ImGui::ColorEdit3("Background", &scene.background_color.x,
                           ImGuiColorEditFlags_Float)) {
       scene.background_color.x = std::max(0.0f, scene.background_color.x);
       scene.background_color.y = std::max(0.0f, scene.background_color.y);
       scene.background_color.z = std::max(0.0f, scene.background_color.z);
-      needs_render = true;
+      request_render();
     }
     if (ImGui::ColorEdit3("Environment color", &scene.environment.color.x,
                           ImGuiColorEditFlags_Float)) {
       scene.environment.color.x = std::max(0.0f, scene.environment.color.x);
       scene.environment.color.y = std::max(0.0f, scene.environment.color.y);
       scene.environment.color.z = std::max(0.0f, scene.environment.color.z);
-      needs_render = true;
+      request_render();
     }
     if (ImGui::SliderFloat("Environment intensity",
                            &scene.environment.intensity, 0.0f, 1.0f)) {
-      needs_render = true;
+      request_render();
     }
 
     const char *light_types[] = {"Point", "Rectangular area", "Directional (sun)"};
@@ -218,13 +222,13 @@ int main() {
           light_polar, scene.sphere.center, {0.0f, -1.0f, 0.0f},
           scene.light.area.width, scene.light.area.height, color, energy);
       }
-      needs_render = true;
+      request_render();
     }
 
     const LightEnergyUi energy_ui = light_energy_ui(scene.light.type);
     if (ImGui::SliderFloat(energy_ui.label, &light_energy(scene.light),
                            energy_ui.minimum, energy_ui.maximum)) {
-      needs_render = true;
+      request_render();
     }
     float light_color_values[3] = {light_color(scene.light).x,
                                    light_color(scene.light).y,
@@ -234,12 +238,17 @@ int main() {
         std::max(0.0f, light_color_values[0]),
         std::max(0.0f, light_color_values[1]),
         std::max(0.0f, light_color_values[2])};
-      needs_render = true;
+      request_render();
     }
     if (ImGui::SliderInt("Samples per pixel", &settings.samples_per_pixel, 1,
                          4)) {
-      needs_render = true;
+      request_render();
     }
+    if (ImGui::SliderInt("Target samples", &settings.target_samples, 1, 256)) {
+      request_render();
+    }
+    ImGui::Text("Accumulated samples: %d / %d", renderer.accumulated_samples(),
+                settings.target_samples);
 
     bool light_parameters_changed = false;
     if (scene.light.type != raypalette::LightType::Directional) {
@@ -274,14 +283,14 @@ int main() {
           light_polar, scene.sphere.center, scene.light.area.normal,
           scene.light.area.width, scene.light.area.height, color, energy);
       }
-      needs_render = true;
+      request_render();
     }
     ImGui::End();
 
     if (needs_render) {
       image = renderer.render(scene, camera, settings);
       texture.upload(image);
-      needs_render = false;
+      needs_render = !renderer.is_accumulation_complete(settings);
     }
 
     ImGui::SetNextWindowSize(
