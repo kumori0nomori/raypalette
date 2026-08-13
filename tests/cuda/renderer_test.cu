@@ -1,5 +1,6 @@
 #include "render/renderer.hpp"
 
+#include <cuda_runtime.h>
 #include <gtest/gtest.h>
 
 #include <cmath>
@@ -7,7 +8,16 @@
 namespace raypalette {
 namespace {
 
+void require_cuda_device() {
+  int device_count = 0;
+  const cudaError_t error = cudaGetDeviceCount(&device_count);
+  if (error != cudaSuccess || device_count == 0) {
+    GTEST_SKIP() << "No CUDA-capable device is available";
+  }
+}
+
 TEST(CudaRenderer, RendersFiniteCanonicalImage) {
+  require_cuda_device();
   Renderer renderer;
   const Image image = renderer.render(make_default_scene(),
                                       make_default_camera(1.0f),
@@ -24,6 +34,7 @@ TEST(CudaRenderer, RendersFiniteCanonicalImage) {
 }
 
 TEST(CudaRenderer, ReturnsBackgroundForRayMiss) {
+  require_cuda_device();
   Scene scene = make_default_scene();
   scene.background_color = {0.25f, 0.5f, 0.75f};
   const Camera miss_camera{{0.0f, 1.0f, 5.0f},

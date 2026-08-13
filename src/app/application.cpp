@@ -15,6 +15,19 @@
 
 namespace {
 
+struct WindowSize {
+  float width;
+  float height;
+};
+
+struct GuiLayout {
+  WindowSize main_window{1100.0f, 760.0f};
+  WindowSize controls_panel{360.0f, 620.0f};
+  WindowSize preview_panel{900.0f, 760.0f};
+};
+
+constexpr GuiLayout kDefaultGuiLayout{};
+
 struct Texture {
   GLuint id = 0;
   int width = 0;
@@ -68,7 +81,11 @@ int main() {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-  GLFWwindow *window = glfwCreateWindow(1100, 760, "RayPalette", nullptr, nullptr);
+  const GuiLayout &layout = kDefaultGuiLayout;
+  GLFWwindow *window = glfwCreateWindow(
+      static_cast<int>(layout.main_window.width),
+      static_cast<int>(layout.main_window.height),
+      "RayPalette", nullptr, nullptr);
   if (window == nullptr) {
     glfwTerminate();
     return 1;
@@ -83,6 +100,8 @@ int main() {
   ImGui_ImplOpenGL3_Init("#version 330");
 
   raypalette::Scene scene = raypalette::make_default_scene();
+  raypalette::PolarCoordinates light_polar{4.0f, 35.0f, 45.0f};
+  int light_type_index = static_cast<int>(scene.light.type);
   raypalette::RenderSettings settings{512, 512, 0.001f};
   raypalette::Camera camera = raypalette::make_default_camera(1.0f);
   raypalette::Renderer renderer;
@@ -96,10 +115,15 @@ int main() {
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
+    ImGui::SetNextWindowSize(
+      ImVec2(layout.controls_panel.width, layout.controls_panel.height),
+      ImGuiCond_FirstUseEver);
     ImGui::Begin("RayPalette Controls");
     ImGui::Text("Deterministic CUDA preview");
     if (ImGui::Button("Reset scene")) {
       scene = raypalette::make_default_scene();
+      light_polar = {4.0f, 35.0f, 45.0f};
+      light_type_index = static_cast<int>(scene.light.type);
       needs_render = true;
     }
     if (ImGui::ColorEdit3(
@@ -121,13 +145,72 @@ int main() {
       scene.background_color.z = std::max(0.0f, scene.background_color.z);
       needs_render = true;
     }
-    if (ImGui::SliderFloat("Light intensity", &scene.light.intensity, 0.0f, 500.0f)) {
+    const char *light_types[] = {"Point", "Rectangular area", "Directional (sun)"};
+    if (ImGui::Combo("Light type", &light_type_index, light_types,
+                     IM_ARRAYSIZE(light_types))) {
+      const raypalette::LightType type =
+          static_cast<raypalette::LightType>(light_type_index);
+      if (type == raypalette::LightType::Point) {
+        scene.light = raypalette::make_point_light(
+            light_polar, scene.sphere.center, scene.light.color,
+            scene.light.intensity);
+      } else if (type == raypalette::LightType::Directional) {
+        scene.light = raypalette::make_directional_light(
+            light_polar.theta_degrees, light_polar.phi_degrees,
+            scene.light.color, scene.light.intensity);
+      } else {
+        scene.light = raypalette::make_rect_area_light(
+            light_polar, scene.sphere.center, {0.0f, -1.0f, 0.0f},
+            scene.light.width, scene.light.height, scene.light.color,
+            scene.light.intensity);
+      }
+      needs_render = true;
+    }
+
+    if (ImGui::SliderFloat("Light intensity", &scene.light.intensity, 0.0f,
+                           500.0f)) {
       needs_render = true;
     }
     float light_color[3] = {scene.light.color.x, scene.light.color.y, scene.light.color.z};
     if (ImGui::ColorEdit3("Light color", light_color)) {
       scene.light.color = {std::max(0.0f, light_color[0]), std::max(0.0f, light_color[1]),
                            std::max(0.0f, light_color[2])};
+      needs_render = true;
+    }
+
+    bool light_parameters_changed = false;
+    if (scene.light.type != raypalette::LightType::Directional) {
+      light_parameters_changed |=
+          ImGui::SliderFloat("Light radius", &light_polar.radius, 0.1f, 20.0f);
+    } else {
+      ImGui::TextDisabled("Sun light has no radius or distance falloff.");
+    }
+    light_parameters_changed |= ImGui::SliderFloat(
+        "Light theta", &light_polar.theta_degrees, 0.0f, 90.0f);
+    light_parameters_changed |= ImGui::SliderFloat(
+        "Light phi", &light_polar.phi_degrees, -180.0f, 180.0f);
+    if (scene.light.type == raypalette::LightType::RectArea) {
+      light_parameters_changed |=
+          ImGui::SliderFloat("Area width", &scene.light.width, 0.1f, 20.0f);
+      light_parameters_changed |=
+          ImGui::SliderFloat("Area height", &scene.light.height, 0.1f, 20.0f);
+      ImGui::TextDisabled("Area-light sampling is not implemented yet.");
+    }
+    if (light_parameters_changed) {
+      if (scene.light.type == raypalette::LightType::Point) {
+        scene.light = raypalette::make_point_light(
+            light_polar, scene.sphere.center, scene.light.color,
+            scene.light.intensity);
+      } else if (scene.light.type == raypalette::LightType::Directional) {
+        scene.light = raypalette::make_directional_light(
+            light_polar.theta_degrees, light_polar.phi_degrees,
+            scene.light.color, scene.light.intensity);
+      } else {
+        scene.light = raypalette::make_rect_area_light(
+            light_polar, scene.sphere.center, scene.light.area_normal,
+            scene.light.width, scene.light.height, scene.light.color,
+            scene.light.intensity);
+      }
       needs_render = true;
     }
     ImGui::End();
@@ -138,6 +221,9 @@ int main() {
       needs_render = false;
     }
 
+    ImGui::SetNextWindowSize(
+      ImVec2(layout.preview_panel.width, layout.preview_panel.height),
+      ImGuiCond_FirstUseEver);
     ImGui::Begin("Preview");
     if (texture.id != 0) {
       ImGui::Image(reinterpret_cast<ImTextureID>(static_cast<std::intptr_t>(texture.id)),
