@@ -152,3 +152,11 @@ Dear ImGui、GLFW、GoogleTest は、CMake の `FetchContent` を通じて
 ダウンロードされます。初回のダウンロードにはネットワーク接続が必要ですが、
 以降は CMake がビルドツリー内に展開したキャッシュを再利用します。Ubuntu では、
 先に上記の GUI 用パッケージをインストールしてから有効にしてください。
+
+## 5. 実行結果
+左のRayPalette Controlsでシーンの設定を行うと、その結果は逐次右画面のPreviewへと反映されます。
+またPreview画面でマウスをクリックするとその下側のPaletteにそのuv位置の色を追加します。
+Paletteを選択して`Ctrl+C`を行うことで貼り付けすることが可能です。
+このPaletteはシーンの設定を変えるたびにリセットされます。
+
+- <img src="./assets/screenshots/20260813_gui.png" alt="実行画面画像" title="実行画面" width="50%">
