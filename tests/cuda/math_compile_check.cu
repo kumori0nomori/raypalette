@@ -10,6 +10,8 @@ namespace raypalette {
 __global__ void math_compile_check_kernel(Vec3 *output) {
   const Vec3 direction = normalized(polar_to_cartesian(1.0f, 90.0f, 0.0f));
   output[0] = linear_to_srgb(apply_exposure(direction, 0.0f));
+  const Hsv hsv = srgb_to_hsv(output[0]);
+  output[0] = hsv_to_srgb(hsv) + hsv_cylinder_position(hsv);
 
   const Sphere sphere{{0.0f, 1.0f, 0.0f}, 1.0f, 0};
   const Plane floor{{0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, 1};
