@@ -170,6 +170,41 @@ __device__ Vec3 shade_metal(const Scene &scene,
   return reflected;
 }
 
+__device__ Vec3 shade_dielectric(const Scene &scene, const Ray &ray,
+                                 const HitRecord &record,
+                                 float minimum_distance, int bounce_count,
+                                 int max_bounces) {
+  const Material &material = scene.materials[record.material_index];
+  if (bounce_count >= max_bounces) {
+    return emitted_radiance(material);
+  }
+
+  const Vec3 unit_direction = normalized(ray.direction);
+  const float cos_theta = fminf(dot(-unit_direction, record.normal), 1.0f);
+  const float sin_theta = sqrtf(fmaxf(0.0f, 1.0f - cos_theta * cos_theta));
+  const float eta_ratio = record.front_face
+                              ? 1.0f / material.index_of_refraction
+                              : material.index_of_refraction;
+  const bool total_internal_reflection = eta_ratio * sin_theta > 1.0f;
+  const float reflectance = schlick_reflectance(cos_theta,
+                                                material.index_of_refraction);
+  const bool reflect = total_internal_reflection || reflectance >= 0.5f;
+
+  Vec3 direction;
+  if (reflect || !refract_direction(unit_direction, record.normal, eta_ratio,
+                                    direction)) {
+    direction = reflect_direction(unit_direction, record.normal);
+  }
+  const float offset_sign = dot(direction, record.normal) > 0.0f ? 1.0f : -1.0f;
+  const Ray scattered{record.position + offset_sign * minimum_distance * record.normal,
+                      direction};
+  return emitted_radiance(material) + 
+         material.base_color * trace_color(scene, scattered,
+                                           minimum_distance,
+                                           bounce_count + 1,
+                                           max_bounces);
+}
+
 __device__ Vec3 shade(const Scene &scene, const Ray &ray,
                       const HitRecord &record, float minimum_distance,
                       int bounce_count, int max_bounces) {
@@ -186,8 +221,8 @@ __device__ Vec3 shade(const Scene &scene, const Ray &ray,
       return shade_diffuse(scene, record, minimum_distance);
 
     case MaterialType::Dielectric:
-      // TODO: implement dielectric shading.
-      return emitted_radiance(material);
+      return shade_dielectric(scene, ray, record, minimum_distance,
+                              bounce_count, max_bounces);
   }
   return emitted_radiance(material);
 }

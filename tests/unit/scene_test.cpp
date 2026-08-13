@@ -43,6 +43,14 @@ TEST(Material, EvaluatesFiniteGgxTerms) {
   EXPECT_TRUE(std::isfinite(ggx_distribution(0.5f, 1.0f)));
 }
 
+TEST(Material, ComputesRefractionAndFresnel) {
+  Vec3 refracted;
+  EXPECT_TRUE(refract_direction({0.0f, -1.0f, 0.0f}, {0.0f, 1.0f, 0.0f},
+                                1.0f / 1.5f, refracted));
+  EXPECT_NEAR(refracted.y, -1.0f, 1.0e-6f);
+  EXPECT_NEAR(schlick_reflectance(1.0f, 1.5f), 0.04f, 1.0e-6f);
+}
+
 TEST(Material, RoughnessChangesGgxDistribution) {
   const float smooth = ggx_distribution(1.0f, 0.1f);
   const float rough = ggx_distribution(1.0f, 0.9f);

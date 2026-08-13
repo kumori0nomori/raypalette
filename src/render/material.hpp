@@ -27,6 +27,30 @@ RAYPALETTE_HOST_DEVICE constexpr Vec3 reflect_direction(const Vec3 &incoming,
   return incoming - 2.0f * dot(incoming, normal) * normal;
 }
 
+RAYPALETTE_HOST_DEVICE inline bool refract_direction(const Vec3 &incoming,
+                                                     const Vec3 &normal,
+                                                     float eta_ratio,
+                                                     Vec3 &refracted) {
+  const Vec3 unit_incoming = normalized(incoming);
+  const float cos_theta = fminf(dot(-unit_incoming, normal), 1.0f);
+  const Vec3 perpendicular = eta_ratio * (unit_incoming + cos_theta * normal);
+  const float parallel_squared = 1.0f - length_squared(perpendicular);
+  if (parallel_squared < 0.0f) {
+    return false;
+  }
+  refracted = perpendicular - sqrtf(parallel_squared) * normal;
+  return true;
+}
+
+RAYPALETTE_HOST_DEVICE inline float schlick_reflectance(float cosine,
+                                                        float index_of_refraction) {
+  float reflectance = (1.0f - index_of_refraction) /
+                      (1.0f + index_of_refraction);
+  reflectance *= reflectance;
+  return reflectance + (1.0f - reflectance) *
+                           powf(1.0f - cosine, 5.0f);
+}
+
 // Schlick's approximation for Fresnel reflectance.
 // F = F0 + (1 - F0) * (1 - cos(theta))^5
 // Reference:
@@ -79,8 +103,8 @@ RAYPALETTE_HOST_DEVICE inline bool is_valid_material(const Material &material) {
     return false;
   }
 
-  return material.type != MaterialType::Dielectric ||
-         material.index_of_refraction >= 1.0f;
+    return material.type != MaterialType::Dielectric ||
+      material.index_of_refraction > 1.0f;
 }
 
 } // namespace raypalette

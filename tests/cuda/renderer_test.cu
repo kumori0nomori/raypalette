@@ -130,5 +130,27 @@ TEST(CudaRenderer, ReflectsBackgroundThroughMetalSphere) {
   EXPECT_NEAR(center_pixel.z, 0.3f, 1.0e-5f);
 }
 
+TEST(CudaRenderer, RendersGlassMaterial) {
+  if (!has_cuda_device()) {
+    GTEST_SKIP() << "No CUDA-capable device is available";
+  }
+  Scene scene = make_default_scene();
+  Material &sphere_material = scene.materials[kSphereMaterialIndex];
+  sphere_material.type = MaterialType::Dielectric;
+  sphere_material.index_of_refraction = 1.5f;
+  sphere_material.base_color = {1.0f, 1.0f, 1.0f};
+  scene.environment.intensity = 0.0f;
+  scene.light.point.radiant_intensity = 0.0f;
+
+  Renderer renderer;
+  const Image image = renderer.render(scene, make_default_camera(1.0f),
+                                      {16, 16, 0.001f, 1, 1, 3});
+  for (const Vec3 &pixel : image.pixels) {
+    EXPECT_TRUE(std::isfinite(pixel.x));
+    EXPECT_TRUE(std::isfinite(pixel.y));
+    EXPECT_TRUE(std::isfinite(pixel.z));
+  }
+}
+
 } // namespace
 } // namespace raypalette

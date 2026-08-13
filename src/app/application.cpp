@@ -127,7 +127,12 @@ struct MaterialUi {
   int label_count;
 };
 
-constexpr const char *kMaterialLabels[] = {"Diffuse", "Metal", "Emissive"};
+constexpr const char *kMaterialLabels[] = {
+  "Diffuse", 
+  "Metal",
+  "Glass",
+  "Emissive"
+};
 constexpr MaterialUi kSphereMaterialUi{
     kMaterialLabels, static_cast<int>(std::size(kMaterialLabels))};
 
@@ -137,10 +142,10 @@ int material_type_index(raypalette::MaterialType type) {
     return 0;
   case raypalette::MaterialType::Metal:
     return 1;
-  case raypalette::MaterialType::Emissive:
-    return 2;
   case raypalette::MaterialType::Dielectric:
-    return 0;
+    return 2;
+  case raypalette::MaterialType::Emissive:
+    return 3;
   }
   return 0;
 }
@@ -150,6 +155,8 @@ raypalette::MaterialType material_type_from_index(int index) {
   case 1:
     return raypalette::MaterialType::Metal;
   case 2:
+    return raypalette::MaterialType::Dielectric;
+  case 3:
     return raypalette::MaterialType::Emissive;
   default:
     return raypalette::MaterialType::Diffuse;
@@ -241,6 +248,16 @@ int main() {
         request_render();
       }
       ImGui::TextDisabled("Perfect mirror reflection; roughness is reserved for GGX.");
+    }
+    if (scene.materials[raypalette::kSphereMaterialIndex].type ==
+        raypalette::MaterialType::Dielectric) {
+      if (ImGui::SliderFloat(
+            "Glass IOR",
+            &scene.materials[raypalette::kSphereMaterialIndex].index_of_refraction,
+            1.01f, 3.0f)) {
+        request_render();
+      }
+      ImGui::TextDisabled("Clear glass: Fresnel reflection and refraction.");
     }
     if (ImGui::ColorEdit3(
           "Floor color",
