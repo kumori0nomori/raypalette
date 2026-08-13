@@ -276,7 +276,6 @@ int main() {
       ImVec2(layout.controls_panel.width, layout.controls_panel.height),
       ImGuiCond_FirstUseEver);
     ImGui::Begin("RayPalette Controls");
-    ImGui::Text("Deterministic CUDA preview");
     if (ImGui::Button("Reset scene")) {
       scene = raypalette::make_default_scene();
       light_polar = {4.0f, 35.0f, 45.0f};
@@ -294,13 +293,6 @@ int main() {
                                 ImGuiTreeNodeFlags_DefaultOpen)) {
       raypalette::Material &sphere_material =
         scene.materials[raypalette::kSphereMaterialIndex];
-      if (sphere_material.type != raypalette::MaterialType::Dielectric) {
-        if (ImGui::ColorEdit3(
-              "Sphere color", &sphere_material.base_color.x,
-              ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs)) {
-          request_render();
-        }
-      }
       int sphere_material_index = material_type_index(
         sphere_material.type);
       if (ImGui::Combo("Sphere material", &sphere_material_index,
@@ -311,13 +303,55 @@ int main() {
           material_type_from_index(sphere_material_index);
         if (next_type == raypalette::MaterialType::Dielectric &&
             previous_type != raypalette::MaterialType::Dielectric) {
-          sphere_material.transmission_color = sphere_material.base_color;
+          sphere_material.transmission_color =
+            previous_type == raypalette::MaterialType::Emissive
+              ? sphere_material.emission_color
+              : sphere_material.base_color;
+          sphere_material.base_color = {1.0f, 1.0f, 1.0f};
+        } else if (next_type == raypalette::MaterialType::Emissive &&
+                   previous_type != raypalette::MaterialType::Emissive) {
+          sphere_material.emission_color =
+            previous_type == raypalette::MaterialType::Dielectric
+              ? sphere_material.transmission_color
+              : sphere_material.base_color;
           sphere_material.base_color = {1.0f, 1.0f, 1.0f};
         } else if (previous_type == raypalette::MaterialType::Dielectric &&
                    next_type != raypalette::MaterialType::Dielectric) {
           sphere_material.base_color = sphere_material.transmission_color;
+        } else if (previous_type == raypalette::MaterialType::Emissive &&
+                   next_type != raypalette::MaterialType::Emissive) {
+          sphere_material.base_color = sphere_material.emission_color;
         }
         sphere_material.type = next_type;
+        request_render();
+      }
+      if (sphere_material.type == raypalette::MaterialType::Dielectric) {
+        if (ImGui::ColorEdit3(
+              "Glass transmission", &sphere_material.transmission_color.x,
+              ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs)) {
+          sphere_material.transmission_color.x =
+            std::max(0.0f, sphere_material.transmission_color.x);
+          sphere_material.transmission_color.y =
+            std::max(0.0f, sphere_material.transmission_color.y);
+          sphere_material.transmission_color.z =
+            std::max(0.0f, sphere_material.transmission_color.z);
+          request_render();
+        }
+      } else if (sphere_material.type == raypalette::MaterialType::Emissive) {
+        if (ImGui::ColorEdit3(
+              "Sphere emission", &sphere_material.emission_color.x,
+              ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs)) {
+          sphere_material.emission_color.x =
+            std::max(0.0f, sphere_material.emission_color.x);
+          sphere_material.emission_color.y =
+            std::max(0.0f, sphere_material.emission_color.y);
+          sphere_material.emission_color.z =
+            std::max(0.0f, sphere_material.emission_color.z);
+          request_render();
+        }
+      } else if (ImGui::ColorEdit3("Sphere color",
+                                   &sphere_material.base_color.x,
+                                   ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs)) {
         request_render();
       }
       if (scene.materials[raypalette::kSphereMaterialIndex].type ==
@@ -328,68 +362,46 @@ int main() {
               0.0f, 1.0f)) {
           request_render();
         }
-        ImGui::TextDisabled("Perfect mirror reflection; roughness is reserved for GGX.");
       }
       if (scene.materials[raypalette::kSphereMaterialIndex].type ==
           raypalette::MaterialType::Dielectric) {
-        if (ImGui::SliderFloat(
-              "Glass IOR",
-              &scene.materials[raypalette::kSphereMaterialIndex].index_of_refraction,
-              1.01f, 3.0f)) {
-          request_render();
-        }
-        if (ImGui::ColorEdit3(
-              "Glass transmission",
-              &scene.materials[raypalette::kSphereMaterialIndex].transmission_color.x,
-              ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs)) {
-          scene.materials[raypalette::kSphereMaterialIndex].transmission_color.x =
-            std::max(0.0f, scene.materials[raypalette::kSphereMaterialIndex]
-                    .transmission_color.x);
-          scene.materials[raypalette::kSphereMaterialIndex].transmission_color.y =
-            std::max(0.0f, scene.materials[raypalette::kSphereMaterialIndex]
-                    .transmission_color.y);
-          scene.materials[raypalette::kSphereMaterialIndex].transmission_color.z =
-            std::max(0.0f, scene.materials[raypalette::kSphereMaterialIndex]
-                    .transmission_color.z);
-          request_render();
-        }
         if (ImGui::SliderFloat(
               "Glass absorption density",
               &scene.materials[raypalette::kSphereMaterialIndex].absorption_density,
               0.0f, 5.0f)) {
           request_render();
         }
-        ImGui::TextDisabled("Clear glass: Fresnel reflection and refraction.");
-      }
-      if (ImGui::ColorEdit3(
-            "Floor color",
-            &scene.materials[raypalette::kFloorMaterialIndex].base_color.x,
-            ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs)) {
-        request_render();
+        constexpr float kMinimumGlassIor = 1.01f;
+        constexpr float kMaximumGlassIor = 3.0f;
+        const float ior_log_denominator = std::log(kMaximumGlassIor);
+        float ior_slider = std::log(
+          std::max(kMinimumGlassIor, sphere_material.index_of_refraction)) /
+                          ior_log_denominator;
+        const float minimum_ior_slider =
+          std::log(kMinimumGlassIor) / ior_log_denominator;
+        if (ImGui::SliderFloat("Glass IOR##slider", &ior_slider,
+                     minimum_ior_slider, 1.0f, "")) {
+          sphere_material.index_of_refraction =
+            1.0f + (std::exp(ior_slider * ior_log_denominator) - 1.0f);
+          request_render();
+        }
+        ImGui::SameLine();
+        ImGui::Text("IOR %.3f", sphere_material.index_of_refraction);
       }
       if (scene.materials[raypalette::kSphereMaterialIndex].type ==
           raypalette::MaterialType::Emissive) {
-        if (ImGui::ColorEdit3(
-              "Sphere emission",
-              &scene.materials[raypalette::kSphereMaterialIndex].emission_color.x,
-              ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs)) {
-          scene.materials[raypalette::kSphereMaterialIndex].emission_color.x =
-            std::max(0.0f, scene.materials[raypalette::kSphereMaterialIndex]
-                      .emission_color.x);
-          scene.materials[raypalette::kSphereMaterialIndex].emission_color.y =
-            std::max(0.0f, scene.materials[raypalette::kSphereMaterialIndex]
-                      .emission_color.y);
-          scene.materials[raypalette::kSphereMaterialIndex].emission_color.z =
-            std::max(0.0f, scene.materials[raypalette::kSphereMaterialIndex]
-                      .emission_color.z);
-          request_render();
-        }
         if (ImGui::SliderFloat(
               "Sphere emission strength",
               &scene.materials[raypalette::kSphereMaterialIndex].emission_strength,
               0.0f, 10.0f)) {
           request_render();
         }
+      }
+      if (ImGui::ColorEdit3(
+            "Floor color",
+            &scene.materials[raypalette::kFloorMaterialIndex].base_color.x,
+            ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs)) {
+        request_render();
       }
     }
 
@@ -400,7 +412,7 @@ int main() {
     if (ImGui::CollapsingHeader("Light", ImGuiTreeNodeFlags_DefaultOpen)) {
       const char *light_types[] = {"Point", "Rectangular area", "Directional (sun)"};
       if (ImGui::Combo("Light type", &light_type_index, light_types,
-                      IM_ARRAYSIZE(light_types))) {
+                       IM_ARRAYSIZE(light_types))) {
         const raypalette::LightType type =
           static_cast<raypalette::LightType>(light_type_index);
         const raypalette::Vec3 color = light_color(scene.light);
@@ -420,21 +432,30 @@ int main() {
         request_render();
       }
 
-      const LightEnergyUi energy_ui = light_energy_ui(scene.light.type);
-      if (ImGui::SliderFloat(energy_ui.label, &light_energy(scene.light),
-                            energy_ui.minimum, energy_ui.maximum)) {
-        request_render();
-      }
       float light_color_values[3] = {light_color(scene.light).x,
                                     light_color(scene.light).y,
                                     light_color(scene.light).z};
       if (ImGui::ColorEdit3("Light color", light_color_values,
-                ImGuiColorEditFlags_NoInputs)) {
+                            ImGuiColorEditFlags_NoInputs)) {
         light_color(scene.light) = {
           std::max(0.0f, light_color_values[0]),
           std::max(0.0f, light_color_values[1]),
           std::max(0.0f, light_color_values[2])};
         request_render();
+      }
+      const LightEnergyUi energy_ui = light_energy_ui(scene.light.type);
+      if (ImGui::SliderFloat(energy_ui.label, &light_energy(scene.light),
+                            energy_ui.minimum, energy_ui.maximum)) {
+        request_render();
+      }
+      if (scene.light.type == raypalette::LightType::RectArea) {
+        float area_size = 0.5f *
+                          (scene.light.area.width + scene.light.area.height);
+        if (ImGui::SliderFloat("Area size", &area_size, 0.1f, 20.0f)) {
+          scene.light.area.width = area_size;
+          scene.light.area.height = area_size;
+          request_render();
+        }
       }
       bool light_parameters_changed = false;
       if (scene.light.type != raypalette::LightType::Directional) {
@@ -448,10 +469,6 @@ int main() {
       light_parameters_changed |= ImGui::SliderFloat(
         "Light phi", &light_polar.phi_degrees, -180.0f, 180.0f);
       if (scene.light.type == raypalette::LightType::RectArea) {
-        light_parameters_changed |=
-          ImGui::SliderFloat("Area width", &scene.light.area.width, 0.1f, 20.0f);
-        light_parameters_changed |=
-          ImGui::SliderFloat("Area height", &scene.light.area.height, 0.1f, 20.0f);
         ImGui::TextDisabled("4 deterministic area-light samples.");
       }
       if (light_parameters_changed) {

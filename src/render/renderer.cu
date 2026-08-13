@@ -47,6 +47,9 @@ __device__ float power_heuristic(float first_pdf, float second_pdf) {
 }
 
 __device__ Vec3 emitted_radiance(const Material &material) {
+  if (material.type != MaterialType::Emissive) {
+    return {};
+  }
   return material.emission_color * material.emission_strength;
 }
 
@@ -99,7 +102,8 @@ __device__ bool try_sample_emissive_sphere(const Scene &scene,
                                            float random_value,
                                            LightSample &sample) {
   const Material &emissive = scene.materials[kSphereMaterialIndex];
-  if (record.material_index == kSphereMaterialIndex ||
+    if (emissive.type != MaterialType::Emissive ||
+      record.material_index == kSphereMaterialIndex ||
       emissive.emission_strength <= 0.0f || sample_index < 0 ||
       sample_index >= kMaxLightSampleCount) {
     return false;
