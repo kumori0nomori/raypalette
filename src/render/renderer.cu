@@ -33,135 +33,163 @@ __device__ Vec3 trace_color(const Scene &scene,
                             int bounce_count,
                             int max_bounces);
 
-__device__ Vec3 shade(const Scene &scene,
-                      const Ray &ray,
-                      const HitRecord &record,
-                      float minimum_distance,
-                      int bounce_count,
-                      int max_bounces) {
-  constexpr int kAreaLightSampleCount = 4;
+constexpr int kAreaLightSampleCount = 4;
 
+__device__ Vec3 emitted_radiance(const Material &material) {
+  return material.emission_color * material.emission_strength;
+}
+
+__device__ bool visible_to_light(const Scene &scene,
+                                 const HitRecord &record,
+                                 const LightSample &light_sample,
+                                 float minimum_distance) {
+  const Ray shadow_ray{record.position + minimum_distance * record.normal,
+                       light_sample.direction_to_light};
+  HitRecord shadow_record;
+  return !hit_scene(scene,
+                    shadow_ray,
+                    minimum_distance,
+                    light_sample.distance,
+                    shadow_record);
+}
+
+// Function to try sampling a light source in the scene based on the sample index.
+// This function is mainly for RectArea lights, which require multiple samples.
+// For Point and Directional lights, only one sample is needed,
+// and the function will return true only for sample_index == 0.
+__device__ bool try_sample_light(const Scene &scene,
+                                 const HitRecord &record,
+                                 int sample_index,
+                                 LightSample &sample) {
+  switch (scene.light.type) {
+    case LightType::RectArea: {
+      const int sample_x = sample_index % 2;
+      const int sample_y = sample_index / 2;
+      const float sample_u = (static_cast<float>(sample_x) + 0.5f) * 0.5f - 0.5f;
+      const float sample_v = (static_cast<float>(sample_y) + 0.5f) * 0.5f - 0.5f;
+      return sample_area_light(scene.light, 
+                               record.position,
+                               sample_u,
+                               sample_v,
+                               sample);
+    }
+    case LightType::Point:
+    case LightType::Directional:
+      // Point and directional lights require only one sample.
+      return sample_index == 0 && sample_light(scene.light, 
+                                               record.position,
+                                               sample);
+  }
+  return false;
+}
+
+__device__ Vec3 shade_diffuse(const Scene &scene, const HitRecord &record,
+                              float minimum_distance) {
   const Material &material = scene.materials[record.material_index];
-  const Vec3 emitted = material.emission_color * material.emission_strength;
-  if (material.type == MaterialType::Emissive) {
-    return emitted;
-  }
-  if (material.type == MaterialType::Metal) {
-    // Compute the view direction and the dot product with the surface normal.
-    const Vec3 view_direction = normalized(-ray.direction);
-    const float n_dot_v = fmaxf(0.0f, dot(record.normal, view_direction));
-
-    // Compute the direct reflection from the light source(s).
-    Vec3 direct_reflection;
-    for (int sample_index = 0; sample_index < kAreaLightSampleCount; ++sample_index) {
-      // Sample the light source(s) based on the light type and sample index.
-      LightSample light_sample;
-      bool has_sample = false;
-      if (scene.light.type == LightType::RectArea) {
-        // Case of RectArea light: sample the area light using a 2x2 grid of samples.
-        const int sample_x = sample_index % 2;
-        const int sample_y = sample_index / 2;
-        const float sample_u = (static_cast<float>(sample_x) + 0.5f) * 0.5f - 0.5f;
-        const float sample_v = (static_cast<float>(sample_y) + 0.5f) * 0.5f - 0.5f;
-        has_sample = sample_area_light(scene.light, record.position, sample_u,
-                                       sample_v, light_sample);
-      } else if (sample_index == 0) {
-        // Case of Point or Directional light: sample the light source once.
-        has_sample = sample_light(scene.light, record.position, light_sample);
-      }
-      if (!has_sample) {
-        // Skip invalid or unsampleable light samples.
-        continue;
-      }
-
-      // Compute the dot products for the shading calculations.
-      const float n_dot_l =
-          fmaxf(0.0f, dot(record.normal, light_sample.direction_to_light));
-      if (n_dot_l <= 0.0f || n_dot_v <= 0.0f) {
-        continue;
-      }
-
-      // Compute the half-vector and the dot products for the GGX shading model.
-      // H = (V + L) / |V + L|
-      const Vec3 half_vector =
-          normalized(view_direction + light_sample.direction_to_light);
-      // GGX shading model calculations.
-      const float n_dot_h = fmaxf(0.0f, dot(record.normal, half_vector));
-      const float v_dot_h = fmaxf(0.0f, dot(view_direction, half_vector));
-      const float distribution = ggx_distribution(n_dot_h, material.roughness);
-      const float geometry = ggx_geometry(n_dot_v, n_dot_l, material.roughness);
-      const Vec3 fresnel = schlick_fresnel(material.base_color, v_dot_h);
-      // Compute the BRDF value using the GGX shading model.
-      // fr = (F * D * G) / (4 * NdotV * NdotL)
-      const Vec3 brdf = fresnel * (distribution * geometry /
-                                   fmaxf(1.0e-6f, 4.0f * n_dot_v * n_dot_l));
-      // Compute the shadow ray and check for occlusion.
-      const Ray shadow_ray{record.position + minimum_distance * record.normal,
-                           light_sample.direction_to_light};
-      HitRecord shadow_record;
-      if (!hit_scene(scene, shadow_ray, minimum_distance, light_sample.distance,
-                     shadow_record)) {
-        direct_reflection += light_sample.radiance * brdf * n_dot_l;
-      }
-    }
-    if (scene.light.type == LightType::RectArea) {
-      direct_reflection *= 1.0f / kAreaLightSampleCount;
-    }
-
-    // Combine the emitted and reflected light.
-    Vec3 reflected = emitted + direct_reflection;
-    if (bounce_count < max_bounces) {
-      const Vec3 reflected_direction =
-          reflect_direction(normalized(ray.direction), record.normal);
-      const Ray reflected_ray{record.position + minimum_distance * record.normal,
-                              reflected_direction};
-      reflected += material.base_color *
-                   trace_color(scene, reflected_ray, minimum_distance,
-                               bounce_count + 1, max_bounces);
-    }
-    return reflected;
-  }
-  if (material.type != MaterialType::Diffuse) {
-    return emitted;
-  }
-
   const Vec3 ambient = material.base_color * scene.environment.color *
                        scene.environment.intensity;
   Vec3 direct_light;
   for (int sample_index = 0; sample_index < kAreaLightSampleCount; ++sample_index) {
     LightSample light_sample;
-    bool has_sample = false;
-    if (scene.light.type == LightType::RectArea) {
-      const int sample_x = sample_index % 2;
-      const int sample_y = sample_index / 2;
-      const float sample_u = (static_cast<float>(sample_x) + 0.5f) * 0.5f - 0.5f;
-      const float sample_v = (static_cast<float>(sample_y) + 0.5f) * 0.5f - 0.5f;
-      has_sample = sample_area_light(scene.light, record.position, sample_u,
-                                     sample_v, light_sample);
-    } else if (sample_index == 0) {
-      has_sample = sample_light(scene.light, record.position, light_sample);
-    }
-    if (!has_sample) {
+    if (!try_sample_light(scene, record, sample_index, light_sample)) {
       continue;
     }
-
     const float cosine =
-        fmaxf(0.0f, dot(record.normal, light_sample.direction_to_light));
-    if (cosine <= 0.0f) {
-      continue;
-    }
-    const Ray shadow_ray{record.position + minimum_distance * record.normal,
-                         light_sample.direction_to_light};
-    HitRecord shadow_record;
-    if (!hit_scene(scene, shadow_ray, minimum_distance, light_sample.distance,
-                   shadow_record)) {
+      fmaxf(0.0f, dot(record.normal, light_sample.direction_to_light));
+    if (cosine > 0.0f && visible_to_light(scene,
+                                          record, 
+                                          light_sample,
+                                          minimum_distance)) {
       direct_light += material.base_color * light_sample.radiance * cosine;
     }
   }
   if (scene.light.type == LightType::RectArea) {
     direct_light *= 1.0f / kAreaLightSampleCount;
   }
-  return emitted + ambient + direct_light;
+  return emitted_radiance(material) + ambient + direct_light;
+}
+
+__device__ Vec3 shade_metal(const Scene &scene,
+                            const Ray &ray,
+                            const HitRecord &record,
+                            float minimum_distance,
+                            int bounce_count,
+                            int max_bounces) {
+  const Material &material = scene.materials[record.material_index];
+  // Compute the view direction and the dot product with the surface normal.
+  const Vec3 view_direction = normalized(-ray.direction);
+  const float n_dot_v = fmaxf(0.0f, dot(record.normal, view_direction));
+
+  // Compute the direct reflection from the light source(s).
+  Vec3 direct_reflection;
+  for (int sample_index = 0; sample_index < kAreaLightSampleCount; ++sample_index) {
+    LightSample light_sample;
+    if (!try_sample_light(scene, record, sample_index, light_sample)) {
+      continue;
+    }
+    // Compute the dot products for the shading calculations.
+    const float n_dot_l =
+        fmaxf(0.0f, dot(record.normal, light_sample.direction_to_light));
+    if (n_dot_l <= 0.0f ||
+        n_dot_v <= 0.0f ||
+        !visible_to_light(scene, record, light_sample, minimum_distance)) {
+      continue;
+    }
+
+    // Compute the half-vector and the dot products for the GGX shading model.
+    // H = (V + L) / |V + L|
+    const Vec3 half_vector =
+        normalized(view_direction + light_sample.direction_to_light);
+    // GGX shading model calculations.
+    const float n_dot_h = fmaxf(0.0f, dot(record.normal, half_vector));
+    const float v_dot_h = fmaxf(0.0f, dot(view_direction, half_vector));
+    const float distribution = ggx_distribution(n_dot_h, material.roughness);
+    const float geometry = ggx_geometry(n_dot_v, n_dot_l, material.roughness);
+    const Vec3 fresnel = schlick_fresnel(material.base_color, v_dot_h);
+    // Compute the BRDF value using the GGX shading model.
+    // fr = (F * D * G) / (4 * NdotV * NdotL)
+    const Vec3 brdf = fresnel * (distribution * geometry /
+                                 fmaxf(1.0e-6f, 4.0f * n_dot_v * n_dot_l));
+    direct_reflection += light_sample.radiance * brdf * n_dot_l;
+  }
+  if (scene.light.type == LightType::RectArea) {
+    direct_reflection *= 1.0f / kAreaLightSampleCount;
+  }
+
+  // Combine the emitted and reflected light.
+  Vec3 reflected = emitted_radiance(material) + direct_reflection;
+  if (bounce_count < max_bounces) {
+    const Vec3 reflected_direction =
+      reflect_direction(normalized(ray.direction), record.normal);
+    const Ray reflected_ray{record.position + minimum_distance * record.normal,
+                            reflected_direction};
+    reflected += material.base_color *
+                 trace_color(scene, reflected_ray, minimum_distance,
+                             bounce_count + 1, max_bounces);
+  }
+  return reflected;
+}
+
+__device__ Vec3 shade(const Scene &scene, const Ray &ray,
+                      const HitRecord &record, float minimum_distance,
+                      int bounce_count, int max_bounces) {
+  const Material &material = scene.materials[record.material_index];
+  switch (material.type) {
+    case MaterialType::Emissive:
+      return emitted_radiance(material);
+
+    case MaterialType::Metal:
+      return shade_metal(scene, ray, record, minimum_distance, bounce_count,
+                         max_bounces);
+
+    case MaterialType::Diffuse:
+      return shade_diffuse(scene, record, minimum_distance);
+
+    case MaterialType::Dielectric:
+      // TODO: implement dielectric shading.
+      return emitted_radiance(material);
+  }
+  return emitted_radiance(material);
 }
 
 __device__ Vec3 trace_color(const Scene &scene,
