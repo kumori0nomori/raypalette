@@ -30,12 +30,12 @@ sudo apt install libgl1-mesa-dev libxrandr-dev libxinerama-dev libxcursor-dev li
 sudo apt install clang-format
 ```
 
-### 1.3. Windows 11（対応予定）
+### 1.3. Windows 11（CPU版GUI確認対象）
 
-- Visual Studio Community 2022 または Build Tools 2022
-- 「C++ によるデスクトップ開発」ワークロード、MSVC v143、Windows SDK
-- NVIDIA CUDA Toolkit 12.8 以降
-- OpenGL / GLFW の開発環境: TBD（Windows 実機で未検証）
+- Visual Studio Community 2026 または Build Tools 2026
+- 「C++ によるデスクトップ開発」ワークロード、MSVC、Windows SDK
+- NVIDIA CUDA Toolkit 12.8 以降（GPU版をビルドする場合のみ）
+- OpenGLはWindows標準の`opengl32`を使用します。GLFWとDear ImGuiはCMakeが取得します。
 
 ## 2. 構成とビルド
 
@@ -59,10 +59,25 @@ ctest --preset linux-cpu-debug --output-on-failure
 ./build/linux-cpu-debug/raypalette_gui
 ```
 
-### 2.2. Windows 11（未検証）
+### 2.2. Windows 11
 
 Visual Studio 2022 の「Developer PowerShell for VS 2022」または同等の開発者用
-コマンドプロンプトで、Debug ビルドを実行します。 TBD
+コマンドプロンプトから実行します。初回の構成ではFetchContentによる依存ライブラリの
+ダウンロードが発生するため、ネットワーク接続が必要です。
+
+```powershell
+# CPU
+cmake --preset windows-cpu-debug
+cmake --build --preset windows-cpu-debug
+ctest --preset windows-cpu-debug --output-on-failure
+.\build\windows-cpu-debug\Debug\raypalette_gui.exe
+
+# GPU
+cmake --preset windows-debug
+cmake --build --preset windows-debug
+ctest --preset windows-debug --output-on-failure
+.\build\windows-debug\Debug\raypalette_gui.exe
+```
 
 ## 3. コード整形
 
@@ -103,9 +118,12 @@ CUDA版では加えて、共有数学ヘッダを`nvcc`で検査するCUDAコン
 GPU Renderer testを実行します。CUDAコンパイルチェックはビルド時に実行され、
 CTestのテスト一覧には含まれません。
 
-### 4.2. Windows 11（未検証）
+### 4.2. Windows 11
 
-TBD
+CPU版は`windows-cpu-debug`または`windows-cpu-release`、GPU版は`windows-debug`または
+`windows-release`のpresetを使用します。Visual Studioジェネレーターでは構成がビルド
+ディレクトリ名に含まれるため、実行ファイルは`build/<preset>/Debug`または
+`build/<preset>/Release`に生成されます。
 
 ## 5. 依存ライブラリ
 

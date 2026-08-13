@@ -2,8 +2,6 @@
 
 #include "render/image.hpp"
 
-#include <GL/gl.h>
-
 #include <vector>
 
 namespace raypalette::ui {
@@ -14,7 +12,7 @@ struct DisplaySettings {
 };
 
 struct Texture {
-  GLuint id = 0;
+  unsigned int id = 0;
   int width = 0;
   int height = 0;
   std::vector<Vec3> display_pixels;
