@@ -23,7 +23,7 @@ struct WindowSize {
 struct GuiLayout {
   WindowSize main_window{1100.0f, 760.0f};
   WindowSize controls_panel{360.0f, 620.0f};
-  WindowSize preview_panel{900.0f, 760.0f};
+  WindowSize preview_panel{600.0f, 600.0f};
 };
 
 constexpr GuiLayout kDefaultGuiLayout{};
@@ -102,7 +102,7 @@ int main() {
   raypalette::Scene scene = raypalette::make_default_scene();
   raypalette::PolarCoordinates light_polar{4.0f, 35.0f, 45.0f};
   int light_type_index = static_cast<int>(scene.light.type);
-  raypalette::RenderSettings settings{512, 512, 0.001f};
+  raypalette::RenderSettings settings{512, 512, 0.001f, 4};
   raypalette::Camera camera = raypalette::make_default_camera(1.0f);
   raypalette::Renderer renderer;
   Texture texture;
@@ -175,6 +175,10 @@ int main() {
     if (ImGui::ColorEdit3("Light color", light_color)) {
       scene.light.color = {std::max(0.0f, light_color[0]), std::max(0.0f, light_color[1]),
                            std::max(0.0f, light_color[2])};
+      needs_render = true;
+    }
+    if (ImGui::SliderInt("Samples per pixel", &settings.samples_per_pixel, 1,
+                         4)) {
       needs_render = true;
     }
 

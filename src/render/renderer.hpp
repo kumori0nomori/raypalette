@@ -10,6 +10,7 @@ struct RenderSettings {
   int width = 32;
   int height = 32;
   float minimum_distance = 0.001f;
+  int samples_per_pixel = 1;
 };
 
 class Renderer {

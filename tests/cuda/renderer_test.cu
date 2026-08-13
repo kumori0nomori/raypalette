@@ -49,5 +49,20 @@ TEST(CudaRenderer, ReturnsBackgroundForRayMiss) {
   EXPECT_NEAR(image.pixels.front().z, 0.75f, 1.0e-6f);
 }
 
+TEST(CudaRenderer, SupportsDeterministicSupersampling) {
+  require_cuda_device();
+  Renderer renderer;
+  RenderSettings settings{32, 32, 0.001f, 4};
+  const Image image = renderer.render(make_default_scene(),
+                                      make_default_camera(1.0f), settings);
+
+  ASSERT_EQ(image.pixels.size(), 1024U);
+  for (const Vec3 &pixel : image.pixels) {
+    EXPECT_TRUE(std::isfinite(pixel.x));
+    EXPECT_TRUE(std::isfinite(pixel.y));
+    EXPECT_TRUE(std::isfinite(pixel.z));
+  }
+}
+
 } // namespace
 } // namespace raypalette

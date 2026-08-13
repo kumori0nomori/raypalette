@@ -66,14 +66,28 @@ __global__ void render_kernel(Vec3 *pixels,
     return;
   }
 
-  const float u = (static_cast<float>(x) + 0.5f) / settings.width;
-  const float v = (static_cast<float>(y) + 0.5f) / settings.height;
+  const int samples_per_side = static_cast<int>(ceilf(
+    sqrtf(static_cast<float>(settings.samples_per_pixel))));
+  Vec3 accumulated_color;
+  for (int sample_index = 0; sample_index < settings.samples_per_pixel;
+      ++sample_index) {
+  const int sample_x = sample_index % samples_per_side;
+  const int sample_y = sample_index / samples_per_side;
+  const float subpixel_x =
+    (static_cast<float>(sample_x) + 0.5f) / samples_per_side;
+  const float subpixel_y =
+    (static_cast<float>(sample_y) + 0.5f) / samples_per_side;
+  const float u = (static_cast<float>(x) + subpixel_x) / settings.width;
+  const float v = (static_cast<float>(y) + subpixel_y) / settings.height;
   const Ray ray = camera_ray(camera, u, v);
   HitRecord record;
+  accumulated_color +=
+    hit_scene(scene, ray, settings.minimum_distance, 1.0e30f, record)
+      ? shade(scene, ray, record, settings.minimum_distance)
+      : scene.background_color;
+  }
   pixels[y * settings.width + x] =
-      hit_scene(scene, ray, settings.minimum_distance, 1.0e30f, record)
-          ? shade(scene, ray, record, settings.minimum_distance)
-          : scene.background_color;
+    accumulated_color * (1.0f / settings.samples_per_pixel);
 }
 
 void check_cuda(cudaError_t error) {
@@ -87,7 +101,9 @@ void check_cuda(cudaError_t error) {
 Image Renderer::render(const Scene &scene,
                        const Camera &camera,
                        const RenderSettings &settings) const {
-  if (settings.width <= 0 || settings.height <= 0 || !is_valid_scene(scene)) {
+  if (settings.width <= 0 || settings.height <= 0 ||
+      settings.samples_per_pixel <= 0 || settings.samples_per_pixel > 16 ||
+      !is_valid_scene(scene)) {
     throw std::invalid_argument("invalid scene or render settings");
   }
 
