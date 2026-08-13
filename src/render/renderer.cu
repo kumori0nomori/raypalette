@@ -31,7 +31,12 @@ __device__ Vec3 trace_color(const Scene &scene,
                             const Ray &ray,
                             float minimum_distance,
                             int bounce_count,
-                            int max_bounces);
+                            int max_bounces,
+                            float random_value);
+
+__device__ float sample_unit(unsigned int pixel_index,
+                             unsigned int sample_index,
+                             unsigned int channel);
 
 constexpr int kAreaLightSampleCount = 4;
 
@@ -114,7 +119,8 @@ __device__ Vec3 shade_metal(const Scene &scene,
                             const HitRecord &record,
                             float minimum_distance,
                             int bounce_count,
-                            int max_bounces) {
+                            int max_bounces,
+                            float random_value) {
   const Material &material = scene.materials[record.material_index];
   // Compute the view direction and the dot product with the surface normal.
   const Vec3 view_direction = normalized(-ray.direction);
@@ -165,7 +171,7 @@ __device__ Vec3 shade_metal(const Scene &scene,
                             reflected_direction};
     reflected += material.base_color *
                  trace_color(scene, reflected_ray, minimum_distance,
-                             bounce_count + 1, max_bounces);
+                             bounce_count + 1, max_bounces, random_value);
   }
   return reflected;
 }
@@ -173,7 +179,8 @@ __device__ Vec3 shade_metal(const Scene &scene,
 __device__ Vec3 shade_dielectric(const Scene &scene, const Ray &ray,
                                  const HitRecord &record,
                                  float minimum_distance, int bounce_count,
-                                 int max_bounces) {
+                                 int max_bounces,
+                                 float random_value) {
   const Material &material = scene.materials[record.material_index];
   if (bounce_count >= max_bounces) {
     return emitted_radiance(material);
@@ -188,7 +195,7 @@ __device__ Vec3 shade_dielectric(const Scene &scene, const Ray &ray,
   const bool total_internal_reflection = eta_ratio * sin_theta > 1.0f;
   const float reflectance = schlick_reflectance(cos_theta,
                                                 material.index_of_refraction);
-  const bool reflect = total_internal_reflection || reflectance >= 0.5f;
+  const bool reflect = total_internal_reflection || random_value < reflectance;
 
   Vec3 direction;
   if (reflect || !refract_direction(unit_direction, record.normal, eta_ratio,
@@ -202,12 +209,13 @@ __device__ Vec3 shade_dielectric(const Scene &scene, const Ray &ray,
          material.base_color * trace_color(scene, scattered,
                                            minimum_distance,
                                            bounce_count + 1,
-                                           max_bounces);
+                                           max_bounces,
+                                           random_value);
 }
 
 __device__ Vec3 shade(const Scene &scene, const Ray &ray,
                       const HitRecord &record, float minimum_distance,
-                      int bounce_count, int max_bounces) {
+                      int bounce_count, int max_bounces, float random_value) {
   const Material &material = scene.materials[record.material_index];
   switch (material.type) {
     case MaterialType::Emissive:
@@ -215,29 +223,30 @@ __device__ Vec3 shade(const Scene &scene, const Ray &ray,
 
     case MaterialType::Metal:
       return shade_metal(scene, ray, record, minimum_distance, bounce_count,
-                         max_bounces);
+                         max_bounces, random_value);
 
     case MaterialType::Diffuse:
       return shade_diffuse(scene, record, minimum_distance);
 
     case MaterialType::Dielectric:
       return shade_dielectric(scene, ray, record, minimum_distance,
-                              bounce_count, max_bounces);
+                              bounce_count, max_bounces, random_value);
   }
-  return emitted_radiance(material);
+  return {};
 }
 
 __device__ Vec3 trace_color(const Scene &scene,
                             const Ray &ray,
                             float minimum_distance,
                             int bounce_count,
-                            int max_bounces) {
+                            int max_bounces,
+                            float random_value) {
   HitRecord record;
   if (!hit_scene(scene, ray, minimum_distance, 1.0e30f, record)) {
     return scene.background_color;
   }
   return shade(scene, ray, record, minimum_distance, bounce_count,
-               max_bounces);
+               max_bounces, random_value);
 }
 
 // Function to generate a pseudo-random sample value
@@ -278,11 +287,12 @@ __global__ void render_kernel(Vec3 *pixels,
         static_cast<unsigned int>(sample_offset + sample_index);
     const float subpixel_x = sample_unit(pixel_index, global_sample, 0);
     const float subpixel_y = sample_unit(pixel_index, global_sample, 1);
+    const float fresnel_random = sample_unit(pixel_index, global_sample, 2);
     const float u = (static_cast<float>(x) + subpixel_x) / settings.width;
     const float v = (static_cast<float>(y) + subpixel_y) / settings.height;
     const Ray ray = camera_ray(camera, u, v);
     accumulated_color += trace_color(scene, ray, settings.minimum_distance, 0,
-                                     settings.max_bounces);
+                                     settings.max_bounces, fresnel_random);
   }
   pixels[y * settings.width + x] =
     accumulated_color * (1.0f / samples_this_frame);
