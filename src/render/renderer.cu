@@ -205,12 +205,15 @@ __device__ Vec3 shade_dielectric(const Scene &scene, const Ray &ray,
   const float offset_sign = dot(direction, record.normal) > 0.0f ? 1.0f : -1.0f;
   const Ray scattered{record.position + offset_sign * minimum_distance * record.normal,
                       direction};
-  return emitted_radiance(material) + 
-         material.base_color * trace_color(scene, scattered,
-                                           minimum_distance,
-                                           bounce_count + 1,
-                                           max_bounces,
-                                           random_value);
+  Vec3 transmitted = material.base_color *
+                     trace_color(scene, scattered, minimum_distance,
+                                 bounce_count + 1, max_bounces, random_value);
+  if (!record.front_face) {
+    transmitted = transmitted * beer_lambert_attenuation(material.transmission_color,
+                                                         material.absorption_density,
+                                                         record.distance);
+  }
+  return emitted_radiance(material) + transmitted;
 }
 
 __device__ Vec3 shade(const Scene &scene, const Ray &ray,

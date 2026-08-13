@@ -20,7 +20,15 @@ struct Material {
   float index_of_refraction = 1.5f;
   Vec3 emission_color{};
   float emission_strength = 0.0f;
+  Vec3 transmission_color{1.0f, 1.0f, 1.0f};
+  float absorption_density = 0.0f;
 };
+
+//
+// Compute the reflected direction and the refracted direction for a dielectric material.
+// - Reflection: light reflects off an object's surface like a mirror. (metal)
+// - Refraction: light bends as it passes through a transparent material. (glass)
+//
 
 RAYPALETTE_HOST_DEVICE constexpr Vec3 reflect_direction(const Vec3 &incoming,
                                                         const Vec3 &normal) {
@@ -31,10 +39,15 @@ RAYPALETTE_HOST_DEVICE inline bool refract_direction(const Vec3 &incoming,
                                                      const Vec3 &normal,
                                                      float eta_ratio,
                                                      Vec3 &refracted) {
+  // Normalize the incoming direction and compute the cosine of the angle between
+  // the incoming ray and the surface normal.
   const Vec3 unit_incoming = normalized(incoming);
   const float cos_theta = fminf(dot(-unit_incoming, normal), 1.0f);
+
+  // Compute the perpendicular and parallel components of the refracted ray.
   const Vec3 perpendicular = eta_ratio * (unit_incoming + cos_theta * normal);
   const float parallel_squared = 1.0f - length_squared(perpendicular);
+  // If the parallel component is negative, total internal reflection occurs.
   if (parallel_squared < 0.0f) {
     return false;
   }
@@ -42,16 +55,35 @@ RAYPALETTE_HOST_DEVICE inline bool refract_direction(const Vec3 &incoming,
   return true;
 }
 
+// Beer-Lambert law for light absorption in a medium.
+// T = exp(-sigma * d)
+// where T is the transmittance, sigma is the absorption coefficient,
+// and d is the distance traveled through the medium.
+RAYPALETTE_HOST_DEVICE inline Vec3 beer_lambert_attenuation(const Vec3 &transmission_color,
+                                                            float absorption_density,
+                                                            float distance) {
+  const float minimum_transmission = 1.0e-6f;
+  const float red = -logf(fmaxf(minimum_transmission, transmission_color.x));
+  const float green = -logf(fmaxf(minimum_transmission, transmission_color.y));
+  const float blue = -logf(fmaxf(minimum_transmission, transmission_color.z));
+  const float scale = fmaxf(0.0f, absorption_density) * fmaxf(0.0f, distance);
+  return {expf(-red * scale), expf(-green * scale), expf(-blue * scale)};
+}
+
+// Dielectric (glass) reflectance probability from IOR using Schlick's approximation.
+// Returns a scalar used to choose reflection versus refraction.
+// R(theta) = R0 + (1 - R0) * (1 - cos(theta))^5
+// where R0 = ((1- eta) / (1 + eta))^2
 RAYPALETTE_HOST_DEVICE inline float schlick_reflectance(float cosine,
                                                         float index_of_refraction) {
   float reflectance = (1.0f - index_of_refraction) /
                       (1.0f + index_of_refraction);
   reflectance *= reflectance;
-  return reflectance + (1.0f - reflectance) *
-                           powf(1.0f - cosine, 5.0f);
+  return reflectance + (1.0f - reflectance) * powf(1.0f - cosine, 5.0f);
 }
 
-// Schlick's approximation for Fresnel reflectance.
+// Metallic Fresnel reflectance using an RGB base reflectance (F0).
+// Returns a colored reflection factor for the GGX BRDF.
 // F = F0 + (1 - F0) * (1 - cos(theta))^5
 // Reference:
 // - https://ja.wikipedia.org/wiki/%E3%83%95%E3%83%AC%E3%83%8D%E3%83%AB%E3%81%AE%E5%BC%8F
@@ -97,9 +129,10 @@ RAYPALETTE_HOST_DEVICE inline float ggx_geometry(float n_dot_v,
 }
 
 RAYPALETTE_HOST_DEVICE inline bool is_valid_material(const Material &material) {
-  if (!is_unit_color(material.base_color) || !is_unit_color(material.emission_color) ||
+    if (!is_unit_color(material.base_color) || !is_unit_color(material.emission_color) ||
+      !is_unit_color(material.transmission_color) ||
       material.roughness < 0.0f || material.roughness > 1.0f ||
-      material.emission_strength < 0.0f) {
+      material.emission_strength < 0.0f || material.absorption_density < 0.0f) {
     return false;
   }
 

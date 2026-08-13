@@ -257,6 +257,27 @@ int main() {
             1.01f, 3.0f)) {
         request_render();
       }
+      if (ImGui::ColorEdit3(
+            "Glass transmission",
+            &scene.materials[raypalette::kSphereMaterialIndex].transmission_color.x,
+            ImGuiColorEditFlags_Float)) {
+         scene.materials[raypalette::kSphereMaterialIndex].transmission_color.x =
+          std::max(0.0f, scene.materials[raypalette::kSphereMaterialIndex]
+                   .transmission_color.x);
+         scene.materials[raypalette::kSphereMaterialIndex].transmission_color.y =
+          std::max(0.0f, scene.materials[raypalette::kSphereMaterialIndex]
+                   .transmission_color.y);
+         scene.materials[raypalette::kSphereMaterialIndex].transmission_color.z =
+          std::max(0.0f, scene.materials[raypalette::kSphereMaterialIndex]
+                   .transmission_color.z);
+         request_render();
+      }
+      if (ImGui::SliderFloat(
+            "Glass absorption density",
+            &scene.materials[raypalette::kSphereMaterialIndex].absorption_density,
+            0.0f, 5.0f)) {
+         request_render();
+      }
       ImGui::TextDisabled("Clear glass: Fresnel reflection and refraction.");
     }
     if (ImGui::ColorEdit3(
@@ -281,9 +302,9 @@ int main() {
       request_render();
     }
     if (ImGui::SliderFloat(
-        "Sphere emission strength",
-        &scene.materials[raypalette::kSphereMaterialIndex].emission_strength,
-        0.0f, 10.0f)) {
+          "Sphere emission strength",
+          &scene.materials[raypalette::kSphereMaterialIndex].emission_strength,
+          0.0f, 10.0f)) {
       request_render();
     }
     if (ImGui::ColorEdit3("Background", &scene.background_color.x,

@@ -51,6 +51,18 @@ TEST(Material, ComputesRefractionAndFresnel) {
   EXPECT_NEAR(schlick_reflectance(1.0f, 1.5f), 0.04f, 1.0e-6f);
 }
 
+TEST(Material, AppliesBeerLambertAbsorption) {
+  const Vec3 clear = beer_lambert_attenuation({1.0f, 1.0f, 1.0f}, 2.0f, 3.0f);
+  const Vec3 tinted = beer_lambert_attenuation({1.0f, 0.5f, 0.25f}, 1.0f, 2.0f);
+
+  EXPECT_FLOAT_EQ(clear.x, 1.0f);
+  EXPECT_FLOAT_EQ(clear.y, 1.0f);
+  EXPECT_FLOAT_EQ(clear.z, 1.0f);
+  EXPECT_NEAR(tinted.x, 1.0f, 1.0e-6f);
+  EXPECT_NEAR(tinted.y, 0.25f, 1.0e-6f);
+  EXPECT_NEAR(tinted.z, 0.0625f, 1.0e-6f);
+}
+
 TEST(Material, RoughnessChangesGgxDistribution) {
   const float smooth = ggx_distribution(1.0f, 0.1f);
   const float rough = ggx_distribution(1.0f, 0.9f);
