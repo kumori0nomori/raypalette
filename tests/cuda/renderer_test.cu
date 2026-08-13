@@ -14,6 +14,24 @@ bool has_cuda_device() {
   return error == cudaSuccess && device_count > 0;
 }
 
+float image_mean_luminance(const Image &image) {
+  float total = 0.0f;
+  for (const Vec3 &pixel : image.pixels) {
+    total += 0.2126f * pixel.x + 0.7152f * pixel.y + 0.0722f * pixel.z;
+  }
+  return total / static_cast<float>(image.pixels.size());
+}
+
+bool image_is_finite(const Image &image) {
+  for (const Vec3 &pixel : image.pixels) {
+    if (!std::isfinite(pixel.x) || !std::isfinite(pixel.y) ||
+        !std::isfinite(pixel.z)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 TEST(CudaRenderer, RendersFiniteCanonicalImage) {
   if (!has_cuda_device()) {
     GTEST_SKIP() << "No CUDA-capable device is available";
@@ -168,16 +186,91 @@ TEST(CudaRenderer, RendersColoredGlassWithFinitePixels) {
   const Image image = renderer.render(scene, make_default_camera(1.0f),
                                       {32, 32, 0.001f, 2, 2, 3});
   bool has_channel_difference = false;
+  EXPECT_TRUE(image_is_finite(image));
   for (const Vec3 &pixel : image.pixels) {
-    EXPECT_TRUE(std::isfinite(pixel.x));
-    EXPECT_TRUE(std::isfinite(pixel.y));
-    EXPECT_TRUE(std::isfinite(pixel.z));
     if (fabsf(pixel.x - pixel.z) > 1.0e-4f ||
         fabsf(pixel.y - pixel.z) > 1.0e-4f) {
       has_channel_difference = true;
     }
   }
   EXPECT_TRUE(has_channel_difference);
+}
+
+TEST(CudaRenderer, GlassIorChangesGpuImageStatistics) {
+  if (!has_cuda_device()) {
+    GTEST_SKIP() << "No CUDA-capable device is available";
+  }
+  Scene scene = make_default_scene();
+  Material &glass = scene.materials[kSphereMaterialIndex];
+  glass.type = MaterialType::Dielectric;
+  glass.base_color = {1.0f, 1.0f, 1.0f};
+  scene.environment.intensity = 0.0f;
+  scene.light.point.radiant_intensity = 0.0f;
+  const Camera camera = make_default_camera(1.0f);
+  const RenderSettings settings{32, 32, 0.001f, 8, 8, 4};
+
+  Renderer low_ior_renderer;
+  glass.index_of_refraction = 1.1f;
+  const Image low_ior = low_ior_renderer.render(scene, camera, settings);
+
+  Renderer high_ior_renderer;
+  glass.index_of_refraction = 2.2f;
+  const Image high_ior = high_ior_renderer.render(scene, camera, settings);
+
+  EXPECT_TRUE(image_is_finite(low_ior));
+  EXPECT_TRUE(image_is_finite(high_ior));
+  EXPECT_GT(fabsf(image_mean_luminance(low_ior) -
+                  image_mean_luminance(high_ior)),
+            1.0e-5f);
+}
+
+TEST(CudaRenderer, GlassAbsorptionChangesGpuImageStatistics) {
+  if (!has_cuda_device()) {
+    GTEST_SKIP() << "No CUDA-capable device is available";
+  }
+  Scene scene = make_default_scene();
+  Material &glass = scene.materials[kSphereMaterialIndex];
+  glass.type = MaterialType::Dielectric;
+  glass.index_of_refraction = 1.5f;
+  glass.base_color = {1.0f, 1.0f, 1.0f};
+  glass.transmission_color = {0.2f, 0.6f, 0.9f};
+  scene.environment.intensity = 0.0f;
+  scene.light.point.radiant_intensity = 0.0f;
+  const Camera camera = make_default_camera(1.0f);
+  const RenderSettings settings{32, 32, 0.001f, 8, 8, 4};
+
+  Renderer clear_renderer;
+  glass.absorption_density = 0.0f;
+  const Image clear = clear_renderer.render(scene, camera, settings);
+
+  Renderer dense_renderer;
+  glass.absorption_density = 3.0f;
+  const Image dense = dense_renderer.render(scene, camera, settings);
+
+  EXPECT_TRUE(image_is_finite(clear));
+  EXPECT_TRUE(image_is_finite(dense));
+  EXPECT_GT(image_mean_luminance(clear), image_mean_luminance(dense));
+}
+
+TEST(CudaRenderer, GlassRemainsFiniteAtObliqueCameraAngle) {
+  if (!has_cuda_device()) {
+    GTEST_SKIP() << "No CUDA-capable device is available";
+  }
+  Scene scene = make_default_scene();
+  Material &glass = scene.materials[kSphereMaterialIndex];
+  glass.type = MaterialType::Dielectric;
+  glass.index_of_refraction = 1.5f;
+  glass.transmission_color = {0.8f, 0.4f, 0.2f};
+  glass.absorption_density = 2.0f;
+  const Camera camera{{2.8f, 1.8f, 4.0f},
+                      {0.0f, 1.0f, 0.0f},
+                      {0.0f, 1.0f, 0.0f},
+                      {0.0f, 0.0f, 0.0f}};
+  Renderer renderer;
+  const Image image = renderer.render(scene, camera,
+                                      {32, 32, 0.001f, 8, 8, 5});
+
+  EXPECT_TRUE(image_is_finite(image));
 }
 
 TEST(CudaRenderer, EmissiveSphereCanIlluminateTheFloor) {
