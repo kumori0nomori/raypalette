@@ -500,14 +500,6 @@ int main() {
     const ImVec2 display_panel_start = begin_settings_panel();
     if (ImGui::CollapsingHeader("Camera / Display",
                                 ImGuiTreeNodeFlags_DefaultOpen)) {
-      if (ImGui::ColorEdit3("Background", &scene.background_color.x,
-                            ImGuiColorEditFlags_Float |
-                              ImGuiColorEditFlags_NoInputs)) {
-        scene.background_color.x = std::max(0.0f, scene.background_color.x);
-        scene.background_color.y = std::max(0.0f, scene.background_color.y);
-        scene.background_color.z = std::max(0.0f, scene.background_color.z);
-        request_render();
-      }
       if (ImGui::SliderFloat("Exposure (EV)", &display_settings.exposure_ev,
                             -4.0f, 4.0f)) {
         clear_palette();

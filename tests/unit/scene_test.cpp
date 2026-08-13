@@ -196,15 +196,15 @@ TEST(Scene, CreatesCanonicalSphereAndFloor) {
   EXPECT_TRUE(is_valid_scene(scene));
 }
 
-TEST(Scene, AllowsHdrDisplayBackgroundButRejectsInvalidValues) {
+TEST(Scene, ValidatesEnvironmentRadianceValues) {
   Scene scene = make_default_scene();
-  scene.background_color = {2.0f, 0.5f, 0.0f};
+  scene.environment.color = {1.0f, 0.5f, 0.0f};
   EXPECT_TRUE(is_valid_scene(scene));
 
-  scene.background_color = {-0.01f, 0.0f, 0.0f};
+  scene.environment.color = {-0.01f, 0.0f, 0.0f};
   EXPECT_FALSE(is_valid_scene(scene));
 
-  scene.background_color.x = std::numeric_limits<float>::infinity();
+  scene.environment.color.x = std::numeric_limits<float>::infinity();
   EXPECT_FALSE(is_valid_scene(scene));
 }
 

@@ -51,12 +51,13 @@ TEST(CudaRenderer, RendersFiniteCanonicalImage) {
   }
 }
 
-TEST(CudaRenderer, ReturnsBackgroundForRayMiss) {
+TEST(CudaRenderer, ReturnsEnvironmentForRayMiss) {
   if (!has_cuda_device()) {
     GTEST_SKIP() << "No CUDA-capable device is available";
   }
   Scene scene = make_default_scene();
-  scene.background_color = {0.25f, 0.5f, 0.75f};
+  scene.environment.color = {0.25f, 0.5f, 0.75f};
+  scene.environment.intensity = 1.0f;
   const Camera miss_camera{{0.0f, 1.0f, 5.0f},
                            {0.0f, 1.0f, 6.0f},
                            {0.0f, 0.0f, 0.0f},
@@ -126,7 +127,7 @@ TEST(CudaRenderer, RendersEmissionWithoutDirectLight) {
   EXPECT_NEAR(center_pixel.z, 1.6f, 1.0e-5f);
 }
 
-TEST(CudaRenderer, ReflectsBackgroundThroughMetalSphere) {
+TEST(CudaRenderer, ReflectsEnvironmentThroughMetalSphere) {
   if (!has_cuda_device()) {
     GTEST_SKIP() << "No CUDA-capable device is available";
   }
@@ -136,7 +137,8 @@ TEST(CudaRenderer, ReflectsBackgroundThroughMetalSphere) {
   sphere_material.base_color = {0.8f, 0.6f, 0.4f};
   scene.environment.intensity = 0.0f;
   scene.light.point.radiant_intensity = 0.0f;
-  scene.background_color = {0.25f, 0.5f, 0.75f};
+  scene.environment.color = {0.25f, 0.5f, 0.75f};
+  scene.environment.intensity = 1.0f;
 
   Renderer renderer;
   const Image image = renderer.render(scene, make_default_camera(1.0f),
@@ -204,7 +206,8 @@ TEST(CudaRenderer, GlassIorChangesGpuImageStatistics) {
   Material &glass = scene.materials[kSphereMaterialIndex];
   glass.type = MaterialType::Dielectric;
   glass.base_color = {1.0f, 1.0f, 1.0f};
-  scene.environment.intensity = 0.0f;
+  scene.environment.color = {0.05f, 0.05f, 0.05f};
+  scene.environment.intensity = 1.0f;
   scene.light.point.radiant_intensity = 0.0f;
   const Camera camera = make_default_camera(1.0f);
   const RenderSettings settings{32, 32, 0.001f, 8, 4, 8, 4};
@@ -234,7 +237,8 @@ TEST(CudaRenderer, GlassAbsorptionChangesGpuImageStatistics) {
   glass.index_of_refraction = 1.5f;
   glass.base_color = {1.0f, 1.0f, 1.0f};
   glass.transmission_color = {0.2f, 0.6f, 0.9f};
-  scene.environment.intensity = 0.0f;
+  scene.environment.color = {0.05f, 0.05f, 0.05f};
+  scene.environment.intensity = 1.0f;
   scene.light.point.radiant_intensity = 0.0f;
   const Camera camera = make_default_camera(1.0f);
   const RenderSettings settings{32, 32, 0.001f, 8, 4, 8, 4};

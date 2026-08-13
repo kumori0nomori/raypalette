@@ -50,6 +50,10 @@ __device__ Vec3 emitted_radiance(const Material &material) {
   return material.emission_color * material.emission_strength;
 }
 
+__device__ Vec3 environment_radiance(const Scene &scene) {
+  return scene.environment.color * scene.environment.intensity;
+}
+
 __device__ bool visible_to_light(const Scene &scene, const HitRecord &record,
                                  const LightSample &light_sample,
                                  float minimum_distance) {
@@ -396,7 +400,7 @@ __device__ Vec3 trace_color(const Scene &scene,
   for (int bounce = bounce_count;; ++bounce) {
     HitRecord record;
     if (!hit_scene(scene, current_ray, minimum_distance, 1.0e30f, record)) {
-      path_radiance += throughput * scene.background_color;
+      path_radiance += throughput * environment_radiance(scene);
       break;
     }
 
