@@ -1,0 +1,29 @@
+name: Windows CPU
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: windows-2025
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Configure CPU GUI build
+        run: >-
+          cmake -S . -B build/windows-ci
+          -G "Visual Studio 17 2022"
+          -A x64
+          -DBUILD_TESTING=ON
+          -DRAYPALETTE_ENABLE_CUDA=OFF
+          -DRAYPALETTE_BUILD_GUI=ON
+          -DRAYPALETTE_FETCH_DEPENDENCIES=ON
+
+      - name: Build
+        run: cmake --build build/windows-ci --config Debug --parallel
+
+      - name: Run tests
+        run: ctest --test-dir build/windows-ci --build-config Debug --output-on-failure
