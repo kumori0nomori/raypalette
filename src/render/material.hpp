@@ -27,6 +27,51 @@ RAYPALETTE_HOST_DEVICE constexpr Vec3 reflect_direction(const Vec3 &incoming,
   return incoming - 2.0f * dot(incoming, normal) * normal;
 }
 
+// Schlick's approximation for Fresnel reflectance.
+// F = F0 + (1 - F0) * (1 - cos(theta))^5
+// Reference:
+// - https://ja.wikipedia.org/wiki/%E3%83%95%E3%83%AC%E3%83%8D%E3%83%AB%E3%81%AE%E5%BC%8F
+RAYPALETTE_HOST_DEVICE inline Vec3 schlick_fresnel(const Vec3 &f0,
+                                                   float cosine) {
+  const float factor = powf(1.0f - fmaxf(0.0f, fminf(1.0f, cosine)), 5.0f);
+  return f0 + (Vec3{1.0f, 1.0f, 1.0f} - f0) * factor;
+}
+
+// GGX microfacet distribution function. (Trowbridge-Reitz (GGX) NDF)
+// D(h) = alpha^2 / (pi * ((n.h)^2 * (alpha^2 - 1) + 1)^2)
+// Reference:
+// - https://hanecci.hatenadiary.org/entry/20130511/p1
+RAYPALETTE_HOST_DEVICE inline float ggx_distribution(float n_dot_h,
+                                                     float roughness) {
+  constexpr float pi = 3.14159265358979323846f;
+  const float alpha = fmaxf(0.001f, roughness * roughness);
+  const float alpha_squared = alpha * alpha;
+  const float n_dot_h_squared = n_dot_h * n_dot_h;
+  const float denominator =
+      n_dot_h_squared * (alpha_squared - 1.0f) + 1.0f;
+  return alpha_squared / (pi * denominator * denominator);
+}
+
+// Approximating shadowing and masking by microfacets. (Schlick-GGX model)
+// G(v) = n.v / (n.v * (1 - k) + k)
+// where k = (alpha + 1)^2 / 8
+RAYPALETTE_HOST_DEVICE inline float ggx_geometry_schlick(float n_dot_v,
+                                                         float roughness) {
+  const float k = (roughness + 1.0f) * (roughness + 1.0f) / 8.0f;
+  return n_dot_v / (n_dot_v * (1.0f - k) + k);
+}
+
+// Light occlusion consists of two phenomena:
+// - shadowing (incoming light blocked): G(v)
+// - masking (reflected light blocked from reaching the camera): G(l)
+// Multiplying them to compute the final geometric attenuation (G(v, l)).
+RAYPALETTE_HOST_DEVICE inline float ggx_geometry(float n_dot_v,
+                                                 float n_dot_l,
+                                                 float roughness) {
+  return ggx_geometry_schlick(n_dot_v, roughness) *
+         ggx_geometry_schlick(n_dot_l, roughness);
+}
+
 RAYPALETTE_HOST_DEVICE inline bool is_valid_material(const Material &material) {
   if (!is_unit_color(material.base_color) || !is_unit_color(material.emission_color) ||
       material.roughness < 0.0f || material.roughness > 1.0f ||

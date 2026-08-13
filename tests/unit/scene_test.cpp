@@ -30,6 +30,26 @@ TEST(Material, RejectsInvalidPhysicalParameters) {
   EXPECT_FALSE(is_valid_material(invalid_emission));
 }
 
+TEST(Material, EvaluatesFiniteGgxTerms) {
+  const Vec3 f0{0.8f, 0.6f, 0.4f};
+  const Vec3 grazing = schlick_fresnel(f0, 0.0f);
+  const Vec3 normal = schlick_fresnel(f0, 1.0f);
+
+  EXPECT_NEAR(normal.x, f0.x, 1.0e-6f);
+  EXPECT_NEAR(normal.y, f0.y, 1.0e-6f);
+  EXPECT_NEAR(grazing.x, 1.0f, 1.0e-6f);
+  EXPECT_NEAR(grazing.y, 1.0f, 1.0e-6f);
+  EXPECT_TRUE(std::isfinite(ggx_distribution(0.5f, 0.0f)));
+  EXPECT_TRUE(std::isfinite(ggx_distribution(0.5f, 1.0f)));
+}
+
+TEST(Material, RoughnessChangesGgxDistribution) {
+  const float smooth = ggx_distribution(1.0f, 0.1f);
+  const float rough = ggx_distribution(1.0f, 0.9f);
+
+  EXPECT_GT(smooth, rough);
+}
+
 TEST(Light, ConvertsPointLightPolarPositionAroundSphereCenter) {
   const Vec3 sphere_center{0.0f, 1.0f, 0.0f};
   const Light light = make_point_light({2.0f, 0.0f, 0.0f}, sphere_center,
