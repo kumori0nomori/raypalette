@@ -194,7 +194,7 @@ int main() {
   raypalette::Scene scene = raypalette::make_default_scene();
   raypalette::PolarCoordinates light_polar{4.0f, 35.0f, 45.0f};
   int light_type_index = static_cast<int>(scene.light.type);
-  raypalette::RenderSettings settings{512, 512, 0.001f, 4, 64};
+  raypalette::RenderSettings settings{512, 512, 0.001f, 4, 4, 64};
   DisplaySettings display_settings;
   raypalette::Camera camera = raypalette::make_default_camera(1.0f);
   raypalette::Renderer renderer;
@@ -375,11 +375,15 @@ int main() {
                          4)) {
       request_render();
     }
-    if (ImGui::SliderInt("Target samples", &settings.target_samples, 1, 256)) {
+    if (ImGui::SliderInt("Light samples", &settings.light_samples_per_frame,
+                         1, 4)) {
+      request_render();
+    }
+    if (ImGui::SliderInt("Target samples", &settings.target_samples_per_pixel, 1, 256)) {
       request_render();
     }
     ImGui::Text("Accumulated samples: %d / %d", renderer.accumulated_samples(),
-                settings.target_samples);
+                settings.target_samples_per_pixel);
 
     bool light_parameters_changed = false;
     if (scene.light.type != raypalette::LightType::Directional) {

@@ -32,7 +32,8 @@ __device__ Vec3 trace_color(const Scene &scene,
                             float minimum_distance,
                             int bounce_count,
                             int max_bounces,
-                            float random_value);
+                            float random_value,
+                            int light_sample_count);
 
 __device__ float sample_unit(unsigned int pixel_index,
                              unsigned int sample_index,
@@ -40,7 +41,10 @@ __device__ float sample_unit(unsigned int pixel_index,
 
 __device__ unsigned int sample_hash(unsigned int value);
 
-constexpr int kAreaLightSampleCount = 4;
+constexpr int kMaxLightSampleCount = 4;
+constexpr std::size_t kRequestedStackSize = 64 * 1024;
+constexpr std::size_t kStackSafetyMargin = 8 * 1024;
+constexpr std::size_t kConservativeStackBytesPerBounce = 8 * 1024;
 
 __device__ Vec3 emitted_radiance(const Material &material) {
   return material.emission_color * material.emission_strength;
@@ -99,7 +103,7 @@ __device__ bool try_sample_emissive_sphere(const Scene &scene,
   if (record.material_index == kSphereMaterialIndex ||
     emissive.emission_strength <= 0.0f ||
       sample_index < 0 ||
-      sample_index >= kAreaLightSampleCount) {
+      sample_index >= kMaxLightSampleCount) {
     return false;
   }
 
@@ -144,14 +148,18 @@ __device__ Vec3 cosine_sample_direction(const Vec3 &normal, float u, float v) {
   return normalized(local.x * tangent + local.y * bitangent + local.z * normal);
 }
 
-__device__ Vec3 shade_diffuse(const Scene &scene, const HitRecord &record,
-                              float minimum_distance, int bounce_count,
-                              int max_bounces, float random_value) {
+__device__ Vec3 shade_diffuse(const Scene &scene,
+                              const HitRecord &record,
+                              float minimum_distance,
+                              int bounce_count,
+                              int max_bounces,
+                              float random_value,
+                              int light_sample_count) {
   const Material &material = scene.materials[record.material_index];
   const Vec3 ambient = material.base_color * scene.environment.color *
                        scene.environment.intensity;
   Vec3 direct_light;
-  for (int sample_index = 0; sample_index < kAreaLightSampleCount; ++sample_index) {
+  for (int sample_index = 0; sample_index < light_sample_count; ++sample_index) {
     LightSample light_sample;
     if (!try_sample_light(scene, record, sample_index, light_sample)) {
       continue;
@@ -166,11 +174,11 @@ __device__ Vec3 shade_diffuse(const Scene &scene, const HitRecord &record,
     }
   }
   if (scene.light.type == LightType::RectArea) {
-    direct_light *= 1.0f / kAreaLightSampleCount;
+    direct_light *= 1.0f / light_sample_count;
   }
 
   Vec3 emissive_direct_light;
-  for (int sample_index = 0; sample_index < kAreaLightSampleCount;
+  for (int sample_index = 0; sample_index < light_sample_count;
        ++sample_index) {
     LightSample light_sample;
     if (!try_sample_emissive_sphere(scene, record, sample_index, light_sample)) {
@@ -184,7 +192,7 @@ __device__ Vec3 shade_diffuse(const Scene &scene, const HitRecord &record,
           material.base_color * light_sample.radiance * cosine;
     }
   }
-  emissive_direct_light *= 1.0f / kAreaLightSampleCount;
+  emissive_direct_light *= 1.0f / light_sample_count;
   Vec3 indirect_light;
   if (bounce_count < max_bounces) {
     const unsigned int random_bits = __float_as_uint(random_value);
@@ -198,7 +206,8 @@ __device__ Vec3 shade_diffuse(const Scene &scene, const HitRecord &record,
                         scattered_direction};
     indirect_light = material.base_color *
                      trace_color(scene, scattered, minimum_distance,
-                                 bounce_count + 1, max_bounces, random_value);
+                                 bounce_count + 1, max_bounces, random_value,
+                                 light_sample_count);
   }
   return emitted_radiance(material) + ambient + direct_light +
          emissive_direct_light + indirect_light;
@@ -210,7 +219,8 @@ __device__ Vec3 shade_metal(const Scene &scene,
                             float minimum_distance,
                             int bounce_count,
                             int max_bounces,
-                            float random_value) {
+                            float random_value,
+                            int light_sample_count) {
   const Material &material = scene.materials[record.material_index];
   // Compute the view direction and the dot product with the surface normal.
   const Vec3 view_direction = normalized(-ray.direction);
@@ -218,7 +228,7 @@ __device__ Vec3 shade_metal(const Scene &scene,
 
   // Compute the direct reflection from the light source(s).
   Vec3 direct_reflection;
-  for (int sample_index = 0; sample_index < kAreaLightSampleCount; ++sample_index) {
+  for (int sample_index = 0; sample_index < light_sample_count; ++sample_index) {
     LightSample light_sample;
     if (!try_sample_light(scene, record, sample_index, light_sample)) {
       continue;
@@ -249,7 +259,7 @@ __device__ Vec3 shade_metal(const Scene &scene,
     direct_reflection += light_sample.radiance * brdf * n_dot_l;
   }
   if (scene.light.type == LightType::RectArea) {
-    direct_reflection *= 1.0f / kAreaLightSampleCount;
+    direct_reflection *= 1.0f / light_sample_count;
   }
 
   // Combine the emitted and reflected light.
@@ -261,16 +271,19 @@ __device__ Vec3 shade_metal(const Scene &scene,
                             reflected_direction};
     reflected += material.base_color *
                  trace_color(scene, reflected_ray, minimum_distance,
-                             bounce_count + 1, max_bounces, random_value);
+                             bounce_count + 1, max_bounces, random_value,
+                             light_sample_count);
   }
   return reflected;
 }
 
 __device__ Vec3 shade_dielectric(const Scene &scene, const Ray &ray,
                                  const HitRecord &record,
-                                 float minimum_distance, int bounce_count,
+                                 float minimum_distance,
+                                 int bounce_count,
                                  int max_bounces,
-                                 float random_value) {
+                                 float random_value,
+                                 int light_sample_count) {
   const Material &material = scene.materials[record.material_index];
   if (bounce_count >= max_bounces) {
     return emitted_radiance(material);
@@ -296,7 +309,8 @@ __device__ Vec3 shade_dielectric(const Scene &scene, const Ray &ray,
                       direction};
   Vec3 transmitted = material.base_color *
                      trace_color(scene, scattered, minimum_distance,
-                                 bounce_count + 1, max_bounces, random_value);
+                                 bounce_count + 1, max_bounces, random_value,
+                                 light_sample_count);
   if (!record.front_face) {
     transmitted = transmitted * beer_lambert_attenuation(material.transmission_color,
                                                          material.absorption_density,
@@ -307,7 +321,8 @@ __device__ Vec3 shade_dielectric(const Scene &scene, const Ray &ray,
 
 __device__ Vec3 shade(const Scene &scene, const Ray &ray,
                       const HitRecord &record, float minimum_distance,
-                      int bounce_count, int max_bounces, float random_value) {
+                      int bounce_count, int max_bounces, float random_value,
+                      int light_sample_count) {
   const Material &material = scene.materials[record.material_index];
   switch (material.type) {
     case MaterialType::Emissive:
@@ -315,15 +330,16 @@ __device__ Vec3 shade(const Scene &scene, const Ray &ray,
 
     case MaterialType::Metal:
       return shade_metal(scene, ray, record, minimum_distance, bounce_count,
-                         max_bounces, random_value);
+                         max_bounces, random_value, light_sample_count);
 
     case MaterialType::Diffuse:
       return shade_diffuse(scene, record, minimum_distance, bounce_count,
-                           max_bounces, random_value);
+                           max_bounces, random_value, light_sample_count);
 
     case MaterialType::Dielectric:
       return shade_dielectric(scene, ray, record, minimum_distance,
-                              bounce_count, max_bounces, random_value);
+                              bounce_count, max_bounces, random_value,
+                              light_sample_count);
   }
   return {};
 }
@@ -333,13 +349,14 @@ __device__ Vec3 trace_color(const Scene &scene,
                             float minimum_distance,
                             int bounce_count,
                             int max_bounces,
-                            float random_value) {
+                            float random_value,
+                            int light_sample_count) {
   HitRecord record;
   if (!hit_scene(scene, ray, minimum_distance, 1.0e30f, record)) {
     return scene.background_color;
   }
   return shade(scene, ray, record, minimum_distance, bounce_count,
-               max_bounces, random_value);
+               max_bounces, random_value, light_sample_count);
 }
 
 // Function to generate a pseudo-random sample value
@@ -385,7 +402,8 @@ __global__ void render_kernel(Vec3 *pixels,
     const float v = (static_cast<float>(y) + subpixel_y) / settings.height;
     const Ray ray = camera_ray(camera, u, v);
     accumulated_color += trace_color(scene, ray, settings.minimum_distance, 0,
-                                     settings.max_bounces, fresnel_random);
+                                     settings.max_bounces, fresnel_random,
+                                     settings.light_samples_per_frame);
   }
   pixels[y * settings.width + x] =
     accumulated_color * (1.0f / samples_this_frame);
@@ -394,6 +412,24 @@ __global__ void render_kernel(Vec3 *pixels,
 void check_cuda(cudaError_t error) {
   if (error != cudaSuccess) {
     throw std::runtime_error(cudaGetErrorString(error));
+  }
+}
+
+void validate_bounce_budget(int max_bounces) {
+  check_cuda(cudaDeviceSetLimit(cudaLimitStackSize, kRequestedStackSize));
+
+  std::size_t stack_limit = 0;
+  check_cuda(cudaDeviceGetLimit(&stack_limit, cudaLimitStackSize));
+  if (stack_limit <= kStackSafetyMargin) {
+    throw std::runtime_error("CUDA device stack limit is too small");
+  }
+
+  const std::size_t available_stack = stack_limit - kStackSafetyMargin;
+  const std::size_t max_bounces_by_stack =
+      available_stack / kConservativeStackBytesPerBounce - 1;
+  if (static_cast<std::size_t>(max_bounces) > max_bounces_by_stack) {
+    throw std::invalid_argument(
+        "max_bounces exceeds the conservative CUDA stack budget");
   }
 }
 
@@ -406,7 +442,9 @@ Image Renderer::render(const Scene &scene,
       settings.height <= 0 ||
       settings.samples_per_pixel <= 0 ||
       settings.samples_per_pixel > 16 ||
-      settings.target_samples <= 0 ||
+      settings.light_samples_per_frame <= 0 ||
+      settings.light_samples_per_frame > kMaxLightSampleCount ||
+      settings.target_samples_per_pixel <= 0 ||
       settings.max_bounces < 0 ||
       !is_valid_scene(scene)) {
     throw std::invalid_argument("invalid scene or render settings");
@@ -423,7 +461,7 @@ Image Renderer::render(const Scene &scene,
     accumulated_pixels_.resize(pixel_count);
   }
 
-  const int remaining_samples = settings.target_samples - accumulated_samples_;
+  const int remaining_samples = settings.target_samples_per_pixel - accumulated_samples_;
   const int samples_this_frame =
       remaining_samples > 0
           ? (remaining_samples < settings.samples_per_pixel
@@ -434,6 +472,8 @@ Image Renderer::render(const Scene &scene,
     Image image{settings.width, settings.height, accumulated_pixels_};
     return image;
   }
+
+  validate_bounce_budget(settings.max_bounces);
 
   Vec3 *device_pixels = nullptr;
   check_cuda(cudaMalloc(&device_pixels, pixel_count * sizeof(Vec3)));
@@ -472,7 +512,7 @@ int Renderer::accumulated_samples() const { return accumulated_samples_; }
 
 bool Renderer::is_accumulation_complete(
     const RenderSettings &settings) const {
-  return accumulated_samples_ >= settings.target_samples;
+  return accumulated_samples_ >= settings.target_samples_per_pixel;
 }
 
 } // namespace raypalette

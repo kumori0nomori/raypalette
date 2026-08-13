@@ -74,7 +74,7 @@ TEST(CudaRenderer, SupportsDeterministicSupersampling) {
     GTEST_SKIP() << "No CUDA-capable device is available";
   }
   Renderer renderer;
-  RenderSettings settings{32, 32, 0.001f, 4};
+  RenderSettings settings{32, 32, 0.001f, 4, 4, 1};
   const Image image = renderer.render(make_default_scene(),
                                       make_default_camera(1.0f), settings);
 
@@ -91,7 +91,7 @@ TEST(CudaRenderer, AccumulatesProgressiveFrames) {
     GTEST_SKIP() << "No CUDA-capable device is available";
   }
   Renderer renderer;
-  RenderSettings settings{8, 8, 0.001f, 2, 4};
+  RenderSettings settings{8, 8, 0.001f, 2, 4, 4};
   const Scene scene = make_default_scene();
   const Camera camera = make_default_camera(1.0f);
 
@@ -162,7 +162,7 @@ TEST(CudaRenderer, RendersGlassMaterial) {
 
   Renderer renderer;
   const Image image = renderer.render(scene, make_default_camera(1.0f),
-                                      {16, 16, 0.001f, 1, 1, 3});
+                                      {16, 16, 0.001f, 1, 4, 1, 3});
   for (const Vec3 &pixel : image.pixels) {
     EXPECT_TRUE(std::isfinite(pixel.x));
     EXPECT_TRUE(std::isfinite(pixel.y));
@@ -184,7 +184,7 @@ TEST(CudaRenderer, RendersColoredGlassWithFinitePixels) {
 
   Renderer renderer;
   const Image image = renderer.render(scene, make_default_camera(1.0f),
-                                      {32, 32, 0.001f, 2, 2, 3});
+                                      {32, 32, 0.001f, 2, 4, 2, 3});
   bool has_channel_difference = false;
   EXPECT_TRUE(image_is_finite(image));
   for (const Vec3 &pixel : image.pixels) {
@@ -207,7 +207,7 @@ TEST(CudaRenderer, GlassIorChangesGpuImageStatistics) {
   scene.environment.intensity = 0.0f;
   scene.light.point.radiant_intensity = 0.0f;
   const Camera camera = make_default_camera(1.0f);
-  const RenderSettings settings{32, 32, 0.001f, 8, 8, 4};
+  const RenderSettings settings{32, 32, 0.001f, 8, 4, 8, 4};
 
   Renderer low_ior_renderer;
   glass.index_of_refraction = 1.1f;
@@ -237,7 +237,7 @@ TEST(CudaRenderer, GlassAbsorptionChangesGpuImageStatistics) {
   scene.environment.intensity = 0.0f;
   scene.light.point.radiant_intensity = 0.0f;
   const Camera camera = make_default_camera(1.0f);
-  const RenderSettings settings{32, 32, 0.001f, 8, 8, 4};
+  const RenderSettings settings{32, 32, 0.001f, 8, 4, 8, 4};
 
   Renderer clear_renderer;
   glass.absorption_density = 0.0f;
@@ -268,7 +268,7 @@ TEST(CudaRenderer, GlassRemainsFiniteAtObliqueCameraAngle) {
                       {0.0f, 0.0f, 0.0f}};
   Renderer renderer;
   const Image image = renderer.render(scene, camera,
-                                      {32, 32, 0.001f, 8, 8, 5});
+                                      {32, 32, 0.001f, 8, 4, 8, 5});
 
   EXPECT_TRUE(image_is_finite(image));
 }
@@ -315,7 +315,7 @@ TEST(CudaRenderer, SingleSphereGlassWithEmissionRemainsFinite) {
 
   Renderer renderer;
   const Image image = renderer.render(scene, make_default_camera(1.0f),
-                                      {32, 32, 0.001f, 2, 2, 4});
+                                      {32, 32, 0.001f, 2, 4, 2, 4});
 
   EXPECT_TRUE(image_is_finite(image));
 }
