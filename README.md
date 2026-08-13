@@ -64,7 +64,7 @@ ctest --preset linux-cpu-debug --output-on-failure
 Visual Studio 2022 の「Developer PowerShell for VS 2022」または同等の開発者用
 コマンドプロンプトで、Debug ビルドを実行します。 TBD
 
-### 3. コード整形
+## 3. コード整形
 
 ### 3.1. Ubuntu 24.04（確認済み）
 
