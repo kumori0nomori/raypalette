@@ -126,6 +126,7 @@ TEST(Light, SamplesPointLightDirectionAndInverseSquareRadiance) {
   EXPECT_FLOAT_EQ(near_sample.distance, 2.0f);
   EXPECT_FLOAT_EQ(near_sample.radiance.x, 4.0f);
   EXPECT_FLOAT_EQ(near_sample.radiance.y, 2.0f);
+  EXPECT_FLOAT_EQ(near_sample.pdf, 0.0f);
   EXPECT_NEAR(far_sample.radiance.x, near_sample.radiance.x * 0.25f, 1.0e-6f);
 }
 
@@ -164,6 +165,7 @@ TEST(Light, ValidatesRectAreaParametersWithoutSampling) {
                                 sample));
   EXPECT_NEAR(sample.direction_to_light.y, 0.8891311f, 1.0e-6f);
   EXPECT_GT(sample.radiance.x, 0.0f);
+  EXPECT_GT(sample.pdf, 0.0f);
 
   EXPECT_FALSE(sample_area_light(light, {0.0f, 10.0f, 0.0f}, 0.0f, 0.0f,
                                  sample));

@@ -128,6 +128,16 @@ RAYPALETTE_HOST_DEVICE inline float ggx_geometry(float n_dot_v,
          ggx_geometry_schlick(n_dot_l, roughness);
 }
 
+RAYPALETTE_HOST_DEVICE inline float ggx_reflection_pdf(float n_dot_h,
+                                                       float v_dot_h,
+                                                       float roughness) {
+  if (n_dot_h <= 0.0f || v_dot_h <= 1.0e-6f) {
+    return 0.0f;
+  }
+  return ggx_distribution(n_dot_h, roughness) * n_dot_h /
+    (4.0f * v_dot_h);
+}
+
 RAYPALETTE_HOST_DEVICE inline bool is_valid_material(const Material &material) {
     if (!is_unit_color(material.base_color) || !is_unit_color(material.emission_color) ||
       !is_unit_color(material.transmission_color) ||

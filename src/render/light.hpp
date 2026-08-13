@@ -55,6 +55,8 @@ struct LightSample {
   Vec3 direction_to_light;
   Vec3 radiance;
   float distance = 0.0f;
+  // Probability density with respect to solid angle. Zero denotes a delta light.
+  float pdf = 0.0f;
 };
 
 RAYPALETTE_HOST_DEVICE inline Light make_point_light(
@@ -151,12 +153,14 @@ RAYPALETTE_HOST_DEVICE inline bool sample_light(const Light &light,
     sample.distance = distance_squared * inverse_distance;
     sample.radiance =
       light.point.color * (light.point.radiant_intensity / distance_squared);
+    sample.pdf = 0.0f;
     return true;
   }
   case LightType::Directional:
     sample.direction_to_light = normalized(light.directional.direction_to_light);
     sample.distance = infinite_distance;
     sample.radiance = light.directional.color * light.directional.irradiance;
+    sample.pdf = 0.0f;
     return true;
   case LightType::RectArea:
     return false;
@@ -194,10 +198,14 @@ RAYPALETTE_HOST_DEVICE inline bool sample_area_light(
   sample.distance = distance_squared * inverse_distance;
   const float light_cosine = fmaxf(0.0f, dot(normal, -sample.direction_to_light));
   const float area = light.area.width * light.area.height;
+  if (light_cosine <= 0.0f || area <= 0.0f) {
+    return false;
+  }
   sample.radiance = light.area.color *
                     (light.area.radiance * area * light_cosine /
                      distance_squared);
-  return light_cosine > 0.0f;
+  sample.pdf = distance_squared / (light_cosine * area);
+  return true;
 }
 
 } // namespace raypalette

@@ -38,6 +38,13 @@ __device__ Vec3 trace_color(const Scene &,
 __device__ unsigned int sample_hash(unsigned int value);
 
 constexpr int kMaxLightSampleCount = 4;
+constexpr float kPi = 3.14159265358979323846f;
+
+__device__ float power_heuristic(float first_pdf, float second_pdf) {
+  const float first_squared = first_pdf * first_pdf;
+  const float second_squared = second_pdf * second_pdf;
+  return first_squared / fmaxf(1.0e-12f, first_squared + second_squared);
+}
 
 __device__ Vec3 emitted_radiance(const Material &material) {
   return material.emission_color * material.emission_strength;
@@ -85,6 +92,7 @@ __device__ bool try_sample_light(const Scene &scene,
 __device__ bool try_sample_emissive_sphere(const Scene &scene,
                                            const HitRecord &record,
                                            int sample_index,
+                                           float random_value,
                                            LightSample &sample) {
   const Material &emissive = scene.materials[kSphereMaterialIndex];
   if (record.material_index == kSphereMaterialIndex ||
@@ -92,11 +100,18 @@ __device__ bool try_sample_emissive_sphere(const Scene &scene,
       sample_index >= kMaxLightSampleCount) {
     return false;
   }
-  // Sample the emissive sphere using predefined normals for simplicity. (approximation)
-  const Vec3 sample_normals[] = {{0.0f, 1.0f, 0.0f}, {0.0f, -1.0f, 0.0f},
-                                 {1.0f, 0.0f, 0.0f}, {-1.0f, 0.0f, 0.0f}};
+  const unsigned int seed = __float_as_uint(random_value) +
+    static_cast<unsigned int>(sample_index * 7919);
+  const float sample_u =
+    static_cast<float>(sample_hash(seed) & 0x00ffffffU) / 16777216.0f;
+  const float sample_v =
+    static_cast<float>(sample_hash(seed + 1U) & 0x00ffffffU) / 16777216.0f;
+  const float z = 1.0f - 2.0f * sample_u;
+  const float phi = 2.0f * kPi * sample_v;
+  const float radial = sqrtf(fmaxf(0.0f, 1.0f - z * z));
+  const Vec3 sample_normal{radial * cosf(phi), radial * sinf(phi), z};
   const Vec3 light_position =
-      scene.sphere.center + scene.sphere.radius * sample_normals[sample_index];
+    scene.sphere.center + scene.sphere.radius * sample_normal;
   const Vec3 offset = light_position - record.position;
   const float distance_squared = length_squared(offset);
   if (distance_squared <= 1.0e-12f) return false;
@@ -106,12 +121,17 @@ __device__ bool try_sample_emissive_sphere(const Scene &scene,
   sample.direction_to_light = offset * inverse_distance;
   sample.distance = distance_squared * inverse_distance;
   const float light_cosine = fmaxf(
-      0.0f, dot(sample_normals[sample_index], -sample.direction_to_light));
+    0.0f, dot(sample_normal, -sample.direction_to_light));
+  const float area = 4.0f * kPi * scene.sphere.radius * scene.sphere.radius;
+  if (light_cosine <= 0.0f || area <= 0.0f) {
+    return false;
+  }
 
   // Compute radiance from the sphere's emission properties.
   sample.radiance = emitted_radiance(emissive) *
                     (light_cosine / distance_squared);
-  return light_cosine > 0.0f;
+  sample.pdf = distance_squared / (light_cosine * area);
+  return true;
 }
 
 __device__ Vec3 cosine_sample_direction(const Vec3 &normal, float u, float v) {
@@ -131,7 +151,8 @@ __device__ Vec3 evaluate_diffuse_lighting(const Scene &scene,
                                           const HitRecord &record,
                                           const Material &material,
                                           float minimum_distance,
-                                          int light_sample_count) {
+                                          int light_sample_count,
+                                          float random_value) {
   const Vec3 ambient = material.base_color * scene.environment.color *
                        scene.environment.intensity;
   Vec3 direct_light;
@@ -144,7 +165,10 @@ __device__ Vec3 evaluate_diffuse_lighting(const Scene &scene,
         fmaxf(0.0f, dot(record.normal, light_sample.direction_to_light));
     if (cosine > 0.0f &&
         visible_to_light(scene, record, light_sample, minimum_distance)) {
-      direct_light += material.base_color * light_sample.radiance * cosine;
+      const float bsdf_pdf = cosine / kPi;
+      const float mis_weight = light_sample.pdf <= 0.0f
+        ? 1.0f : power_heuristic(light_sample.pdf, bsdf_pdf);
+      direct_light += material.base_color * light_sample.radiance * cosine * mis_weight;
     }
   }
   if (scene.light.type == LightType::RectArea) {
@@ -156,15 +180,17 @@ __device__ Vec3 evaluate_diffuse_lighting(const Scene &scene,
        ++sample_index) {
     LightSample light_sample;
     if (!try_sample_emissive_sphere(scene, record, sample_index,
-                                    light_sample)) {
+                                    random_value, light_sample)) {
       continue;
     }
     const float cosine =
         fmaxf(0.0f, dot(record.normal, light_sample.direction_to_light));
     if (cosine > 0.0f &&
         visible_to_light(scene, record, light_sample, minimum_distance)) {
-      emissive_direct_light +=
-          material.base_color * light_sample.radiance * cosine;
+        const float bsdf_pdf = cosine / kPi;
+        const float mis_weight = power_heuristic(light_sample.pdf, bsdf_pdf);
+        emissive_direct_light += 
+          material.base_color * light_sample.radiance * cosine * mis_weight;
     }
   }
   emissive_direct_light *= 1.0f / light_sample_count;
@@ -201,7 +227,11 @@ __device__ Vec3 evaluate_metal_lighting(const Scene &scene,
     const Vec3 brdf = fresnel *
                       (distribution * geometry /
                        fmaxf(1.0e-6f, 4.0f * n_dot_v * n_dot_l));
-    direct_reflection += light_sample.radiance * brdf * n_dot_l;
+    const float bsdf_pdf = ggx_reflection_pdf(n_dot_h, v_dot_h,
+                          material.roughness);
+    const float mis_weight = light_sample.pdf <= 0.0f
+      ? 1.0f : power_heuristic(light_sample.pdf, bsdf_pdf);
+    direct_reflection += light_sample.radiance * brdf * n_dot_l * mis_weight;
   }
   if (scene.light.type == LightType::RectArea) {
     direct_reflection *= 1.0f / light_sample_count;
@@ -252,6 +282,104 @@ __device__ void scatter_dielectric(const Ray &ray,
   }
 }
 
+__device__ void scatter_metal(const Ray &ray,
+                              const HitRecord &record,
+                              const Material &material,
+                              float random_value,
+                              int bounce,
+                              Vec3 &direction,
+                              Vec3 &throughput_factor,
+                              float &next_random,
+                              float &bsdf_pdf) {
+  const Vec3 incoming = normalized(ray.direction);
+  if (material.roughness <= 0.001f) {
+    direction = reflect_direction(incoming, record.normal);
+    throughput_factor = material.base_color;
+    next_random = random_value;
+    bsdf_pdf = 0.0f;
+    return;
+  }
+
+  const unsigned int seed = __float_as_uint(random_value) +
+                            static_cast<unsigned int>(bounce * 7919);
+  const float sample_u =
+      static_cast<float>(sample_hash(seed) & 0x00ffffffU) / 16777216.0f;
+  next_random = static_cast<float>(sample_hash(seed + 1U) & 0x00ffffffU) /
+                16777216.0f;
+  const float alpha = material.roughness * material.roughness;
+  const float alpha_squared = alpha * alpha;
+  const float cos_theta = sqrtf((1.0f - next_random) /
+                                (1.0f + (alpha_squared - 1.0f) * next_random));
+  const float sin_theta = sqrtf(fmaxf(0.0f, 1.0f - cos_theta * cos_theta));
+  const float phi = 2.0f * kPi * sample_u;
+  const Vec3 local_half{sin_theta * cosf(phi), sin_theta * sinf(phi),
+                        cos_theta};
+  const Vec3 reference = fabsf(record.normal.x) > 0.9f
+                             ? Vec3{0.0f, 1.0f, 0.0f}
+                             : Vec3{1.0f, 0.0f, 0.0f};
+  const Vec3 tangent = normalized(cross(reference, record.normal));
+  const Vec3 half_vector = normalized(
+      local_half.x * tangent + local_half.y * cross(record.normal, tangent) +
+      local_half.z * record.normal);
+  direction = reflect_direction(incoming, half_vector);
+
+  const Vec3 view_direction = normalized(-incoming);
+  const float n_dot_v = fmaxf(0.0f, dot(record.normal, view_direction));
+  const float n_dot_l = fmaxf(0.0f, dot(record.normal, direction));
+  const float n_dot_h = fmaxf(0.0f, dot(record.normal, half_vector));
+  const float v_dot_h = fmaxf(0.0f, dot(view_direction, half_vector));
+  if (n_dot_l <= 0.0f || n_dot_v <= 0.0f || n_dot_h <= 0.0f ||
+      v_dot_h <= 1.0e-6f) {
+    direction = reflect_direction(incoming, record.normal);
+    throughput_factor = material.base_color;
+    bsdf_pdf = 0.0f;
+    return;
+  }
+
+  const float geometry = ggx_geometry(n_dot_v, n_dot_l, material.roughness);
+  const Vec3 fresnel = schlick_fresnel(material.base_color, v_dot_h);
+  throughput_factor = fresnel *
+                      (geometry * v_dot_h /
+                       fmaxf(1.0e-6f, n_dot_v * n_dot_h));
+  bsdf_pdf = ggx_reflection_pdf(n_dot_h, v_dot_h, material.roughness);
+}
+
+__device__ float emissive_sphere_pdf(const Scene &scene,
+                                     const Ray &ray,
+                                     const HitRecord &record) {
+  const Vec3 surface_normal = normalized(record.position - scene.sphere.center);
+  const float light_cosine =
+      fmaxf(0.0f, dot(surface_normal, -ray.direction));
+  const float area = 4.0f * kPi * scene.sphere.radius * scene.sphere.radius;
+  if (light_cosine <= 0.0f || area <= 0.0f) {
+    return 0.0f;
+  }
+  return record.distance * record.distance / (light_cosine * area);
+}
+
+__device__ bool apply_russian_roulette(Vec3 &throughput,
+                                       float &random_value,
+                                       int bounce) {
+  constexpr int kRouletteStartBounce = 3;
+  if (bounce < kRouletteStartBounce) {
+    return true;
+  }
+  const float maximum_throughput =
+      fmaxf(throughput.x, fmaxf(throughput.y, throughput.z));
+  const float survival_probability =
+      fminf(0.95f, fmaxf(0.05f, maximum_throughput));
+  const bool survives = random_value < survival_probability;
+  const unsigned int random_bits = __float_as_uint(random_value);
+  random_value = static_cast<float>(sample_hash(
+      random_bits + static_cast<unsigned int>(bounce * 104729)) &
+                                      0x00ffffffU) / 16777216.0f;
+  if (!survives) {
+    return false;
+  }
+  throughput = throughput * (1.0f / survival_probability);
+  return true;
+}
+
 __device__ Vec3 trace_color(const Scene &scene,
                             const Ray &ray,
                             float minimum_distance,
@@ -263,6 +391,8 @@ __device__ Vec3 trace_color(const Scene &scene,
   Vec3 throughput{1.0f, 1.0f, 1.0f};
   Vec3 path_radiance;
   float path_random = random_value;
+  float previous_bsdf_pdf = 0.0f;
+  bool previous_scatter_was_delta = true;
   for (int bounce = bounce_count;; ++bounce) {
     HitRecord record;
     if (!hit_scene(scene, current_ray, minimum_distance, 1.0e30f, record)) {
@@ -271,7 +401,15 @@ __device__ Vec3 trace_color(const Scene &scene,
     }
 
     const Material &material = scene.materials[record.material_index];
-    path_radiance += throughput * emitted_radiance(material);
+    float emission_mis_weight = 1.0f;
+    if (material.type == MaterialType::Emissive &&
+        !previous_scatter_was_delta &&
+        record.material_index == kSphereMaterialIndex) {
+      const float light_pdf = emissive_sphere_pdf(scene, current_ray, record);
+      emission_mis_weight = power_heuristic(previous_bsdf_pdf, light_pdf);
+    }
+    path_radiance += throughput * emitted_radiance(material) *
+                     emission_mis_weight;
     if (material.type == MaterialType::Emissive) {
       break;
     }
@@ -279,14 +417,20 @@ __device__ Vec3 trace_color(const Scene &scene,
     switch (material.type) {
     case MaterialType::Diffuse: {
       path_radiance += throughput * evaluate_diffuse_lighting(
-          scene, record, material, minimum_distance, light_sample_count);
+          scene, record, material, minimum_distance, light_sample_count,
+          path_random);
       if (bounce >= max_bounces) {
         return path_radiance;
       }
+      if (!apply_russian_roulette(throughput, path_random, bounce)) {
+        return path_radiance;
+      }
 
-        const Vec3 scattered_direction = next_diffuse_direction(
-            record, path_random, bounce, path_random);
+      const Vec3 scattered_direction = next_diffuse_direction(
+        record, path_random, bounce, path_random);
       throughput = throughput * material.base_color;
+      previous_bsdf_pdf = fmaxf(0.0f, dot(record.normal, scattered_direction)) / kPi;
+      previous_scatter_was_delta = false;
       current_ray = {record.position + minimum_distance * record.normal,
                      scattered_direction};
       continue;
@@ -294,21 +438,35 @@ __device__ Vec3 trace_color(const Scene &scene,
 
     case MaterialType::Metal: {
       path_radiance += throughput * evaluate_metal_lighting(
-          scene, current_ray, record, material, minimum_distance,
-          light_sample_count);
+        scene, current_ray, record, material, minimum_distance,
+        light_sample_count);
       if (bounce >= max_bounces) {
         return path_radiance;
       }
+      if (!apply_russian_roulette(throughput, path_random, bounce)) {
+        return path_radiance;
+      }
 
-      throughput = throughput * material.base_color;
+      Vec3 direction;
+      Vec3 throughput_factor;
+      float next_random;
+      float bsdf_pdf;
+      scatter_metal(current_ray, record, material, path_random, bounce,
+                    direction, throughput_factor, next_random, bsdf_pdf);
+      throughput = throughput * throughput_factor;
+      previous_bsdf_pdf = bsdf_pdf;
+      previous_scatter_was_delta = bsdf_pdf <= 0.0f;
       current_ray = {record.position + minimum_distance * record.normal,
-                     reflect_direction(normalized(current_ray.direction),
-                                       record.normal)};
+             direction};
+      path_random = next_random;
       continue;
     }
 
     case MaterialType::Dielectric: {
       if (bounce >= max_bounces) {
+        return path_radiance;
+      }
+      if (!apply_russian_roulette(throughput, path_random, bounce)) {
         return path_radiance;
       }
       Vec3 direction;
