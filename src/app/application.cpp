@@ -257,7 +257,7 @@ int main() {
         ImGui::SliderFloat("Area width", &scene.light.area.width, 0.1f, 20.0f);
       light_parameters_changed |=
         ImGui::SliderFloat("Area height", &scene.light.area.height, 0.1f, 20.0f);
-      ImGui::TextDisabled("Area-light sampling is not implemented yet.");
+      ImGui::TextDisabled("4 deterministic area-light samples.");
     }
     if (light_parameters_changed) {
       const raypalette::Vec3 color = light_color(scene.light);

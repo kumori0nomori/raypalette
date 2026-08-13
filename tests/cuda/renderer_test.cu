@@ -8,16 +8,16 @@
 namespace raypalette {
 namespace {
 
-void require_cuda_device() {
+bool has_cuda_device() {
   int device_count = 0;
   const cudaError_t error = cudaGetDeviceCount(&device_count);
-  if (error != cudaSuccess || device_count == 0) {
-    GTEST_SKIP() << "No CUDA-capable device is available";
-  }
+  return error == cudaSuccess && device_count > 0;
 }
 
 TEST(CudaRenderer, RendersFiniteCanonicalImage) {
-  require_cuda_device();
+  if (!has_cuda_device()) {
+    GTEST_SKIP() << "No CUDA-capable device is available";
+  }
   Renderer renderer;
   const Image image = renderer.render(make_default_scene(),
                                       make_default_camera(1.0f),
@@ -34,7 +34,9 @@ TEST(CudaRenderer, RendersFiniteCanonicalImage) {
 }
 
 TEST(CudaRenderer, ReturnsBackgroundForRayMiss) {
-  require_cuda_device();
+  if (!has_cuda_device()) {
+    GTEST_SKIP() << "No CUDA-capable device is available";
+  }
   Scene scene = make_default_scene();
   scene.background_color = {0.25f, 0.5f, 0.75f};
   const Camera miss_camera{{0.0f, 1.0f, 5.0f},
@@ -50,7 +52,9 @@ TEST(CudaRenderer, ReturnsBackgroundForRayMiss) {
 }
 
 TEST(CudaRenderer, SupportsDeterministicSupersampling) {
-  require_cuda_device();
+  if (!has_cuda_device()) {
+    GTEST_SKIP() << "No CUDA-capable device is available";
+  }
   Renderer renderer;
   RenderSettings settings{32, 32, 0.001f, 4};
   const Image image = renderer.render(make_default_scene(),

@@ -38,24 +38,42 @@ __device__ Vec3 shade(const Scene &scene,
 
   const Vec3 ambient = material.base_color * scene.environment.color *
                        scene.environment.intensity;
-  LightSample light_sample;
-  if (!sample_light(scene.light, record.position, light_sample)) {
-    return ambient;
-  }
+  constexpr int area_sample_count = 4;
+  Vec3 direct_light;
+  for (int sample_index = 0; sample_index < area_sample_count; ++sample_index) {
+    LightSample light_sample;
+    bool has_sample = false;
+    if (scene.light.type == LightType::RectArea) {
+      const int sample_x = sample_index % 2;
+      const int sample_y = sample_index / 2;
+      const float sample_u = (static_cast<float>(sample_x) + 0.5f) * 0.5f - 0.5f;
+      const float sample_v = (static_cast<float>(sample_y) + 0.5f) * 0.5f - 0.5f;
+      has_sample = sample_area_light(scene.light, record.position, sample_u,
+                                     sample_v, light_sample);
+    } else if (sample_index == 0) {
+      has_sample = sample_light(scene.light, record.position, light_sample);
+    }
+    if (!has_sample) {
+      continue;
+    }
 
-  const float cosine = fmaxf(0.0f, dot(record.normal, light_sample.direction_to_light));
-  if (cosine <= 0.0f) {
-    return ambient;
+    const float cosine =
+        fmaxf(0.0f, dot(record.normal, light_sample.direction_to_light));
+    if (cosine <= 0.0f) {
+      continue;
+    }
+    const Ray shadow_ray{record.position + minimum_distance * record.normal,
+                         light_sample.direction_to_light};
+    HitRecord shadow_record;
+    if (!hit_scene(scene, shadow_ray, minimum_distance, light_sample.distance,
+                   shadow_record)) {
+      direct_light += material.base_color * light_sample.radiance * cosine;
+    }
   }
-
-  const Ray shadow_ray{record.position + minimum_distance * record.normal,
-                       light_sample.direction_to_light};
-  HitRecord shadow_record;
-  if (hit_scene(scene, shadow_ray, minimum_distance, light_sample.distance,
-                shadow_record)) {
-    return ambient;
+  if (scene.light.type == LightType::RectArea) {
+    direct_light *= 1.0f / area_sample_count;
   }
-  return ambient + material.base_color * light_sample.radiance * cosine;
+  return ambient + direct_light;
 }
 
 __global__ void render_kernel(Vec3 *pixels,

@@ -106,6 +106,15 @@ TEST(Light, ValidatesRectAreaParametersWithoutSampling) {
   EXPECT_EQ(light.type, LightType::RectArea);
   EXPECT_TRUE(is_valid_light(light));
   EXPECT_FALSE(sample_light(light, {}, sample));
+  ASSERT_TRUE(sample_area_light(light, {0.0f, -1.0f, 0.0f}, 0.0f, 0.0f,
+                                sample));
+  EXPECT_NEAR(sample.direction_to_light.y, 0.8891311f, 1.0e-6f);
+  EXPECT_GT(sample.radiance.x, 0.0f);
+
+  EXPECT_FALSE(sample_area_light(light, {0.0f, 10.0f, 0.0f}, 0.0f, 0.0f,
+                                 sample));
+  EXPECT_FALSE(sample_area_light(light, {0.0f, -1.0f, 0.0f}, 0.6f, 0.0f,
+                                 sample));
 
   Light invalid_light = light;
   invalid_light.area.width = 0.0f;
