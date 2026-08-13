@@ -108,5 +108,27 @@ TEST(CudaRenderer, RendersEmissionWithoutDirectLight) {
   EXPECT_NEAR(center_pixel.z, 1.6f, 1.0e-5f);
 }
 
+TEST(CudaRenderer, ReflectsBackgroundThroughMetalSphere) {
+  if (!has_cuda_device()) {
+    GTEST_SKIP() << "No CUDA-capable device is available";
+  }
+  Scene scene = make_default_scene();
+  Material &sphere_material = scene.materials[kSphereMaterialIndex];
+  sphere_material.type = MaterialType::Metal;
+  sphere_material.base_color = {0.8f, 0.6f, 0.4f};
+  scene.environment.intensity = 0.0f;
+  scene.light.point.radiant_intensity = 0.0f;
+  scene.background_color = {0.25f, 0.5f, 0.75f};
+
+  Renderer renderer;
+  const Image image = renderer.render(scene, make_default_camera(1.0f),
+                                      {32, 32, 0.001f, 1, 1, 1});
+  const Vec3 &center_pixel = image.pixels[16 * image.width + 16];
+
+  EXPECT_NEAR(center_pixel.x, 0.2f, 1.0e-5f);
+  EXPECT_NEAR(center_pixel.y, 0.3f, 1.0e-5f);
+  EXPECT_NEAR(center_pixel.z, 0.3f, 1.0e-5f);
+}
+
 } // namespace
 } // namespace raypalette

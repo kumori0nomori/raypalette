@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <iterator>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -121,6 +122,40 @@ LightEnergyUi light_energy_ui(raypalette::LightType type) {
   return {"Light energy", 0.0f, 1.0f};
 }
 
+struct MaterialUi {
+  const char *const *labels;
+  int label_count;
+};
+
+constexpr const char *kMaterialLabels[] = {"Diffuse", "Metal", "Emissive"};
+constexpr MaterialUi kSphereMaterialUi{
+    kMaterialLabels, static_cast<int>(std::size(kMaterialLabels))};
+
+int material_type_index(raypalette::MaterialType type) {
+  switch (type) {
+  case raypalette::MaterialType::Diffuse:
+    return 0;
+  case raypalette::MaterialType::Metal:
+    return 1;
+  case raypalette::MaterialType::Emissive:
+    return 2;
+  case raypalette::MaterialType::Dielectric:
+    return 0;
+  }
+  return 0;
+}
+
+raypalette::MaterialType material_type_from_index(int index) {
+  switch (index) {
+  case 1:
+    return raypalette::MaterialType::Metal;
+  case 2:
+    return raypalette::MaterialType::Emissive;
+  default:
+    return raypalette::MaterialType::Diffuse;
+  }
+}
+
 } // namespace
 
 int main() {
@@ -187,6 +222,25 @@ int main() {
           &scene.materials[raypalette::kSphereMaterialIndex].base_color.x,
           ImGuiColorEditFlags_Float)) {
       request_render();
+    }
+    int sphere_material_index = material_type_index(
+      scene.materials[raypalette::kSphereMaterialIndex].type);
+    if (ImGui::Combo("Sphere material", &sphere_material_index,
+                     kSphereMaterialUi.labels,
+                     kSphereMaterialUi.label_count)) {
+      scene.materials[raypalette::kSphereMaterialIndex].type =
+        material_type_from_index(sphere_material_index);
+      request_render();
+    }
+    if (scene.materials[raypalette::kSphereMaterialIndex].type ==
+          raypalette::MaterialType::Metal) {
+      if (ImGui::SliderFloat(
+            "Metal roughness",
+            &scene.materials[raypalette::kSphereMaterialIndex].roughness,
+            0.0f, 1.0f)) {
+        request_render();
+      }
+      ImGui::TextDisabled("Perfect mirror reflection; roughness is reserved for GGX.");
     }
     if (ImGui::ColorEdit3(
           "Floor color",

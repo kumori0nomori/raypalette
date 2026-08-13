@@ -22,6 +22,11 @@ struct Material {
   float emission_strength = 0.0f;
 };
 
+RAYPALETTE_HOST_DEVICE constexpr Vec3 reflect_direction(const Vec3 &incoming,
+                                                        const Vec3 &normal) {
+  return incoming - 2.0f * dot(incoming, normal) * normal;
+}
+
 RAYPALETTE_HOST_DEVICE inline bool is_valid_material(const Material &material) {
   if (!is_unit_color(material.base_color) || !is_unit_color(material.emission_color) ||
       material.roughness < 0.0f || material.roughness > 1.0f ||

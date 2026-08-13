@@ -27,14 +27,34 @@ __device__ bool hit_scene(const Scene &scene,
   return hit_anything;
 }
 
+__device__ Vec3 trace_color(const Scene &scene,
+                            const Ray &ray,
+                            float minimum_distance,
+                            int bounce_count,
+                            int max_bounces);
+
 __device__ Vec3 shade(const Scene &scene,
                       const Ray &ray,
                       const HitRecord &record,
-                      float minimum_distance) {
+                      float minimum_distance,
+                      int bounce_count,
+                      int max_bounces) {
   const Material &material = scene.materials[record.material_index];
   const Vec3 emitted = material.emission_color * material.emission_strength;
   if (material.type == MaterialType::Emissive) {
     return emitted;
+  }
+  if (material.type == MaterialType::Metal) {
+    if (bounce_count >= max_bounces) {
+      return emitted;
+    }
+    const Vec3 reflected_direction =
+        reflect_direction(normalized(ray.direction), record.normal);
+    const Ray reflected_ray{record.position + minimum_distance * record.normal,
+                            reflected_direction};
+    return emitted + material.base_color *
+                         trace_color(scene, reflected_ray, minimum_distance,
+                                     bounce_count + 1, max_bounces);
   }
   if (material.type != MaterialType::Diffuse) {
     return emitted;
@@ -80,6 +100,19 @@ __device__ Vec3 shade(const Scene &scene,
   return emitted + ambient + direct_light;
 }
 
+__device__ Vec3 trace_color(const Scene &scene,
+                            const Ray &ray,
+                            float minimum_distance,
+                            int bounce_count,
+                            int max_bounces) {
+  HitRecord record;
+  if (!hit_scene(scene, ray, minimum_distance, 1.0e30f, record)) {
+    return scene.background_color;
+  }
+  return shade(scene, ray, record, minimum_distance, bounce_count,
+               max_bounces);
+}
+
 // Function to generate a pseudo-random sample value
 // based on pixel index, sample index, and channel.
 __device__ unsigned int sample_hash(unsigned int value) {
@@ -91,7 +124,8 @@ __device__ unsigned int sample_hash(unsigned int value) {
 }
 
 // Function to generate a pseudo-random sample value in the range [0, 1).
-__device__ float sample_unit(unsigned int pixel_index, unsigned int sample_index,
+__device__ float sample_unit(unsigned int pixel_index,
+                             unsigned int sample_index,
                              unsigned int channel) {
   const unsigned int seed = pixel_index * 9781U + sample_index * 6271U +
                             channel * 26699U;
@@ -120,11 +154,8 @@ __global__ void render_kernel(Vec3 *pixels,
     const float u = (static_cast<float>(x) + subpixel_x) / settings.width;
     const float v = (static_cast<float>(y) + subpixel_y) / settings.height;
     const Ray ray = camera_ray(camera, u, v);
-    HitRecord record;
-    accumulated_color +=
-      hit_scene(scene, ray, settings.minimum_distance, 1.0e30f, record)
-        ? shade(scene, ray, record, settings.minimum_distance)
-        : scene.background_color;
+    accumulated_color += trace_color(scene, ray, settings.minimum_distance, 0,
+                                     settings.max_bounces);
   }
   pixels[y * settings.width + x] =
     accumulated_color * (1.0f / samples_this_frame);
@@ -141,9 +172,12 @@ void check_cuda(cudaError_t error) {
 Image Renderer::render(const Scene &scene,
                        const Camera &camera,
              const RenderSettings &settings) {
-  if (settings.width <= 0 || settings.height <= 0 ||
-      settings.samples_per_pixel <= 0 || settings.samples_per_pixel > 16 ||
-    settings.target_samples <= 0 ||
+  if (settings.width <= 0 ||
+      settings.height <= 0 ||
+      settings.samples_per_pixel <= 0 ||
+      settings.samples_per_pixel > 16 ||
+      settings.target_samples <= 0 ||
+      settings.max_bounces < 0 ||
       !is_valid_scene(scene)) {
     throw std::invalid_argument("invalid scene or render settings");
   }
