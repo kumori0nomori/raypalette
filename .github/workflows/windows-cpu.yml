@@ -12,18 +12,21 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v5
 
+      - name: Set up MSVC development environment
+        uses: ilammy/msvc-dev-cmd@v1
+
       - name: Configure CPU GUI build
         run: >-
           cmake -S . -B build/windows-ci
-          -G "Visual Studio 17 2022"
-          -A x64
+          -G Ninja
+          -DCMAKE_BUILD_TYPE=Debug
           -DBUILD_TESTING=ON
           -DRAYPALETTE_ENABLE_CUDA=OFF
           -DRAYPALETTE_BUILD_GUI=ON
           -DRAYPALETTE_FETCH_DEPENDENCIES=ON
 
       - name: Build
-        run: cmake --build build/windows-ci --config Debug --parallel
+        run: cmake --build build/windows-ci --parallel
 
       - name: Run tests
-        run: ctest --test-dir build/windows-ci --build-config Debug --output-on-failure
+        run: ctest --test-dir build/windows-ci --output-on-failure
