@@ -204,7 +204,9 @@ int main() {
     /*max_bounces=*/8
   };
   DisplaySettings display_settings;
-  raypalette::Camera camera = raypalette::make_default_camera(1.0f);
+  float camera_distance = 5.0f;
+  raypalette::Camera camera = raypalette::make_default_camera(
+    1.0f, camera_distance);
   raypalette::Renderer renderer;
   Texture texture;
   raypalette::Image image;
@@ -246,6 +248,8 @@ int main() {
       scene = raypalette::make_default_scene();
       light_polar = {4.0f, 35.0f, 45.0f};
       light_type_index = static_cast<int>(scene.light.type);
+      camera_distance = 5.0f;
+      camera = raypalette::make_default_camera(1.0f, camera_distance);
       request_render();
     }
 
@@ -476,6 +480,11 @@ int main() {
       if (ImGui::Checkbox("Reinhard tone mapping",
                           &display_settings.use_reinhard)) {
         needs_display_update = true;
+      }
+      if (ImGui::SliderFloat("Camera distance", &camera_distance, 2.0f,
+                             10.0f)) {
+        camera = raypalette::make_default_camera(1.0f, camera_distance);
+        request_render();
       }
     }
     end_settings_panel(display_panel_start);

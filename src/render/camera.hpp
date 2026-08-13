@@ -11,8 +11,9 @@ struct Camera {
   Vec3 vertical{0.0f, 1.0f, 0.0f};
 };
 
-inline Camera make_default_camera(float aspect_ratio) {
-  const Vec3 origin{0.0f, 1.5f, 5.0f};
+inline Camera make_default_camera(float aspect_ratio,
+                                  float camera_distance = 5.0f) {
+  const Vec3 origin{0.0f, 1.5f, camera_distance};
   const Vec3 look_at{0.0f, 1.0f, 0.0f};
   const Vec3 up{0.0f, 1.0f, 0.0f};
   const float viewport_height = 2.0f;
