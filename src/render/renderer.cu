@@ -88,6 +88,46 @@ __device__ bool try_sample_light(const Scene &scene,
   return false;
 }
 
+__device__ bool try_sample_emissive_sphere(const Scene &scene,
+                                           const HitRecord &record,
+                                           int sample_index,
+                                           LightSample &sample) {
+  // Check if the sphere is emissive and the sample index is valid.
+  if (record.material_index == kSphereMaterialIndex ||
+      scene.materials[kSphereMaterialIndex].type != MaterialType::Emissive ||
+      sample_index < 0 ||
+      sample_index >= kAreaLightSampleCount) {
+    return false;
+  }
+
+  // Sample the emissive sphere using predefined normals for simplicity. (approximation)
+  const Vec3 sample_normals[] = {
+    {0.0f, 1.0f, 0.0f},
+    {0.0f, -1.0f, 0.0f},
+    {1.0f, 0.0f, 0.0f},
+    {-1.0f, 0.0f, 0.0f}
+  };
+  const Vec3 light_position =
+      scene.sphere.center + scene.sphere.radius * sample_normals[sample_index];
+  const Vec3 offset = light_position - record.position;
+  const float distance_squared = length_squared(offset);
+  if (distance_squared <= 1.0e-12f) {
+    return false;
+  }
+
+  // Compute the direction to the light, distance, and radiance.
+  const float inverse_distance = 1.0f / sqrtf(distance_squared);
+  sample.direction_to_light = offset * inverse_distance;
+  sample.distance = distance_squared * inverse_distance;
+  const float light_cosine =
+      fmaxf(0.0f, dot(sample_normals[sample_index], -sample.direction_to_light));
+
+  // Compute the radiance based on the emissive material properties.
+  const Material &emissive = scene.materials[kSphereMaterialIndex];
+  sample.radiance = emitted_radiance(emissive) * (light_cosine / distance_squared);
+  return light_cosine > 0.0f;
+}
+
 __device__ Vec3 shade_diffuse(const Scene &scene, const HitRecord &record,
                               float minimum_distance) {
   const Material &material = scene.materials[record.material_index];
@@ -111,7 +151,27 @@ __device__ Vec3 shade_diffuse(const Scene &scene, const HitRecord &record,
   if (scene.light.type == LightType::RectArea) {
     direct_light *= 1.0f / kAreaLightSampleCount;
   }
-  return emitted_radiance(material) + ambient + direct_light;
+
+  Vec3 emissive_direct_light;
+  for (int sample_index = 0; sample_index < kAreaLightSampleCount;
+       ++sample_index) {
+    LightSample light_sample;
+    if (!try_sample_emissive_sphere(scene, record, sample_index, light_sample)) {
+      continue;
+    }
+    const float cosine =
+        fmaxf(0.0f, dot(record.normal, light_sample.direction_to_light));
+    if (cosine > 0.0f && visible_to_light(scene, record, light_sample,
+                                          minimum_distance)) {
+      emissive_direct_light +=
+          material.base_color * light_sample.radiance * cosine;
+    }
+  }
+  emissive_direct_light *= 1.0f / kAreaLightSampleCount;
+  return emitted_radiance(material) +
+    ambient +
+    direct_light +
+    emissive_direct_light;
 }
 
 __device__ Vec3 shade_metal(const Scene &scene,

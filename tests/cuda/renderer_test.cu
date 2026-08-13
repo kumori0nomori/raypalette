@@ -180,5 +180,30 @@ TEST(CudaRenderer, RendersColoredGlassWithFinitePixels) {
   EXPECT_TRUE(has_channel_difference);
 }
 
+TEST(CudaRenderer, EmissiveSphereCanIlluminateTheFloor) {
+  if (!has_cuda_device()) {
+    GTEST_SKIP() << "No CUDA-capable device is available";
+  }
+  Scene scene = make_default_scene();
+  scene.materials[kSphereMaterialIndex].type = MaterialType::Emissive;
+  scene.materials[kSphereMaterialIndex].emission_color = {1.0f, 0.1f, 0.02f};
+  scene.materials[kSphereMaterialIndex].emission_strength = 8.0f;
+  scene.environment.intensity = 0.0f;
+  scene.light.point.radiant_intensity = 0.0f;
+
+  Renderer renderer;
+  const Image image = renderer.render(scene, make_default_camera(1.0f),
+                                      {32, 32, 0.001f, 1, 1, 1});
+
+  bool has_nonblack_floor_pixel = false;
+  for (const Vec3 &pixel : image.pixels) {
+    if (pixel.x > 0.001f || pixel.y > 0.001f || pixel.z > 0.001f) {
+      has_nonblack_floor_pixel = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(has_nonblack_floor_pixel);
+}
+
 } // namespace
 } // namespace raypalette
