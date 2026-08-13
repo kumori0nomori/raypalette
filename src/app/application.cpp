@@ -25,8 +25,9 @@ struct WindowSize {
 
 struct GuiLayout {
   WindowSize main_window{1100.0f, 760.0f};
-  WindowSize controls_panel{360.0f, 620.0f};
-  WindowSize preview_panel{600.0f, 600.0f};
+  WindowSize controls_panel{360.0f, 750.0f};
+  WindowSize preview_panel{600.0f, 750.0f};
+  WindowSize hsv_space_panel{480.0f, 750.0f};
 };
 
 constexpr GuiLayout kDefaultGuiLayout{};
@@ -41,6 +42,23 @@ struct PaletteColor {
   std::string hex;
   float u = 0.0f;
   float v = 0.0f;
+};
+
+struct HsvPlotPoint {
+  raypalette::Vec3 display_color;
+  raypalette::Hsv hsv;
+  raypalette::Vec3 cylinder_position;
+};
+
+struct HsvPlotView {
+  float yaw = -0.65f;
+  float pitch = 0.35f;
+  float zoom = 1.0f;
+};
+
+struct HsvHueSection {
+  float hue = 0.0f;
+  static constexpr float half_width = 1.0f / 120.0f;
 };
 
 std::string color_to_hex(const raypalette::Vec3 &color) {
@@ -148,6 +166,476 @@ LightEnergyUi light_energy_ui(raypalette::LightType type) {
   return {"Light energy", 0.0f, 1.0f};
 }
 
+raypalette::Vec3 sphere_material_color(const raypalette::Material &material) {
+  switch (material.type) {
+    case raypalette::MaterialType::Dielectric:
+      return material.transmission_color;
+    case raypalette::MaterialType::Emissive:
+      return material.emission_color;
+    case raypalette::MaterialType::Diffuse:
+    case raypalette::MaterialType::Metal:
+      return material.base_color;
+  }
+  return material.base_color;
+}
+
+std::vector<HsvPlotPoint> make_sphere_hsv_points(
+    const Texture &texture, 
+    const raypalette::Scene &scene,
+    const raypalette::Camera &camera,
+    const raypalette::RenderSettings &settings) {
+  constexpr int kMaximumPointCount = 2000;
+  std::vector<HsvPlotPoint> points;
+  if (texture.width <= 0 || texture.height <= 0 ||
+      texture.display_pixels.empty()) {
+    return points;
+  }
+
+  const int pixel_count = texture.width * texture.height;
+  const int stride = std::max(
+      1, static_cast<int>(std::ceil(std::sqrt(
+              static_cast<float>(pixel_count) / kMaximumPointCount))));
+  points.reserve(std::min(kMaximumPointCount, pixel_count));
+  for (int pixel_y = stride / 2; pixel_y < texture.height; pixel_y += stride) {
+    for (int pixel_x = stride / 2; pixel_x < texture.width; pixel_x += stride) {
+      const float u = (static_cast<float>(pixel_x) + 0.5f) / texture.width;
+      const float v = (static_cast<float>(pixel_y) + 0.5f) / texture.height;
+      raypalette::HitRecord hit;
+      if (!raypalette::hit_sphere(scene.sphere,
+                                  raypalette::camera_ray(camera, u, v),
+                                  settings.minimum_distance, 1.0e30f, hit)) {
+        continue;
+      }
+      const raypalette::Vec3 display_color =
+          texture.display_pixels[pixel_y * texture.width + pixel_x];
+        const raypalette::Hsv hsv = raypalette::srgb_to_hsv(display_color);
+        points.push_back(
+          {display_color, hsv, raypalette::hsv_cylinder_position(hsv)});
+    }
+  }
+  return points;
+}
+
+raypalette::Vec3 rotate_hsv_plot_position(const raypalette::Vec3 &position,
+                                          const HsvPlotView &view) {
+  const float yaw_cosine = std::cos(view.yaw);
+  const float yaw_sine = std::sin(view.yaw);
+  const float pitch_cosine = std::cos(view.pitch);
+  const float pitch_sine = std::sin(view.pitch);
+  const float yaw_x = yaw_cosine * position.x - yaw_sine * position.z;
+  const float yaw_z = yaw_sine * position.x + yaw_cosine * position.z;
+  return {yaw_x, pitch_cosine * (position.y - 0.5f) - pitch_sine * yaw_z,
+          pitch_sine * (position.y - 0.5f) + pitch_cosine * yaw_z};
+}
+
+struct HsvScreenPoint {
+  ImVec2 position;
+  float depth = 0.0f;
+};
+
+HsvScreenPoint project_hsv_position(const raypalette::Vec3 &position,
+                                    const ImVec2 &center, float scale,
+                                    const HsvPlotView &view) {
+  const raypalette::Vec3 rotated = rotate_hsv_plot_position(position, view);
+  return {{center.x + rotated.x * scale, center.y - rotated.y * scale},
+          rotated.z};
+}
+
+ImU32 hsv_plot_color(const raypalette::Vec3 &color, float alpha = 1.0f) {
+  return ImGui::ColorConvertFloat4ToU32(
+      ImVec4(color.x, color.y, color.z, alpha));
+}
+
+void draw_hsv_space(const std::vector<HsvPlotPoint> &points,
+                    const raypalette::Vec3 &sphere_color,
+                    const raypalette::Vec3 &light_color_value,
+                    float light_energy_value, float light_energy_maximum,
+                    HsvHueSection &section,
+                    const std::vector<PaletteColor> &palette,
+                    int selected_palette_index, HsvPlotView &view) {
+  if (ImGui::Button("Reset HSV view")) {
+    view = {};
+  }
+  ImGui::SameLine();
+  ImGui::TextDisabled("Drag to orbit. Scroll to zoom.");
+
+  const ImVec2 available = ImGui::GetContentRegionAvail();
+  const float canvas_size = std::max(240.0f, std::min(420.0f, available.x));
+  ImGui::InvisibleButton("##hsv-space-canvas", ImVec2(canvas_size, canvas_size),
+                        ImGuiButtonFlags_MouseButtonLeft);
+  const ImVec2 canvas_min = ImGui::GetItemRectMin();
+  const ImVec2 canvas_max = ImGui::GetItemRectMax();
+  const ImVec2 center((canvas_min.x + canvas_max.x) * 0.5f,
+                      (canvas_min.y + canvas_max.y) * 0.5f);
+  const bool hovered = ImGui::IsItemHovered();
+  if (hovered && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
+    const ImVec2 drag_delta = ImGui::GetIO().MouseDelta;
+    view.yaw += drag_delta.x * 0.01f;
+    view.pitch = std::clamp(view.pitch + drag_delta.y * 0.01f, -1.4f, 1.4f);
+  }
+  if (hovered && ImGui::GetIO().MouseWheel != 0.0f) {
+    view.zoom = std::clamp(view.zoom + ImGui::GetIO().MouseWheel * 0.1f,
+                            0.55f, 1.8f);
+  }
+
+  ImDrawList *draw_list = ImGui::GetWindowDrawList();
+  draw_list->AddRectFilled(canvas_min, canvas_max,
+                            ImGui::GetColorU32(ImGuiCol_FrameBg));
+  draw_list->AddRect(canvas_min, canvas_max, ImGui::GetColorU32(ImGuiCol_Border));
+  const float scale = canvas_size * 0.31f * view.zoom;
+  const ImU32 guide_color = ImGui::GetColorU32(ImGuiCol_TextDisabled);
+  if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+    constexpr int kHueSelectionSamples = 360;
+    const ImVec2 mouse = ImGui::GetIO().MousePos;
+    float nearest_distance_squared = 1.0e30f;
+    float selected_hue = section.hue;
+    for (int sample = 0; sample < kHueSelectionSamples; ++sample) {
+      const float hue = static_cast<float>(sample) / kHueSelectionSamples;
+      const raypalette::Vec3 base_direction = raypalette::hsv_cylinder_position(
+          {hue, 1.0f, 0.0f});
+      const HsvScreenPoint rim =
+          project_hsv_position(base_direction, center, scale, view);
+      const float direction_x = rim.position.x - center.x;
+      const float direction_y = rim.position.y - center.y;
+      const float direction_length_squared =
+          direction_x * direction_x + direction_y * direction_y;
+      if (direction_length_squared <= 1.0e-6f) {
+        continue;
+      }
+      const float mouse_x = mouse.x - center.x;
+      const float mouse_y = mouse.y - center.y;
+      const float projection = std::clamp(
+          (mouse_x * direction_x + mouse_y * direction_y) /
+              direction_length_squared,
+          0.0f, 1.0f);
+      const float closest_x = center.x + projection * direction_x;
+      const float closest_y = center.y + projection * direction_y;
+      const float distance_x = mouse.x - closest_x;
+      const float distance_y = mouse.y - closest_y;
+      const float distance_squared = distance_x * distance_x +
+                                     distance_y * distance_y;
+      if (distance_squared < nearest_distance_squared) {
+        nearest_distance_squared = distance_squared;
+        selected_hue = hue;
+      }
+    }
+    section.hue = selected_hue;
+  }
+  constexpr int kRingSegments = 32;
+  constexpr int kColorWheelRings = 12;
+  for (int segment = 0; segment < kRingSegments; ++segment) {
+    const float hue_a = static_cast<float>(segment) / kRingSegments;
+    const float hue_b = static_cast<float>(segment + 1) / kRingSegments;
+    const float angle_a = 6.28318530717958647692f * hue_a;
+    const float angle_b = 6.28318530717958647692f * hue_b;
+    for (int ring = 0; ring < kColorWheelRings; ++ring) {
+    const float inner_saturation =
+      static_cast<float>(ring) / kColorWheelRings;
+    const float outer_saturation =
+      static_cast<float>(ring + 1) / kColorWheelRings;
+    const HsvScreenPoint inner_a = project_hsv_position(
+      {inner_saturation * std::cos(angle_a), 0.0f,
+        inner_saturation * std::sin(angle_a)}, center, scale, view);
+    const HsvScreenPoint inner_b = project_hsv_position(
+      {inner_saturation * std::cos(angle_b), 0.0f,
+        inner_saturation * std::sin(angle_b)}, center, scale, view);
+    const HsvScreenPoint outer_a = project_hsv_position(
+      {outer_saturation * std::cos(angle_a), 0.0f,
+        outer_saturation * std::sin(angle_a)}, center, scale, view);
+    const HsvScreenPoint outer_b = project_hsv_position(
+      {outer_saturation * std::cos(angle_b), 0.0f,
+        outer_saturation * std::sin(angle_b)}, center, scale, view);
+    const raypalette::Vec3 color = raypalette::hsv_to_srgb(
+      {(hue_a + hue_b) * 0.5f, outer_saturation, 1.0f});
+    draw_list->AddQuadFilled(inner_a.position, inner_b.position,
+                  outer_b.position, outer_a.position,
+                  hsv_plot_color(color));
+    }
+  }
+  for (int segment = 0; segment < kRingSegments; ++segment) {
+    const float angle_a = 6.28318530717958647692f * segment / kRingSegments;
+    const float angle_b = 6.28318530717958647692f * (segment + 1) /
+                          kRingSegments;
+    const raypalette::Vec3 lower_a{std::cos(angle_a), 0.0f, std::sin(angle_a)};
+    const raypalette::Vec3 lower_b{std::cos(angle_b), 0.0f, std::sin(angle_b)};
+    const raypalette::Vec3 upper_a{lower_a.x, 1.0f, lower_a.z};
+    const raypalette::Vec3 upper_b{lower_b.x, 1.0f, lower_b.z};
+    const HsvScreenPoint lower_a_screen =
+        project_hsv_position(lower_a, center, scale, view);
+    const HsvScreenPoint lower_b_screen =
+        project_hsv_position(lower_b, center, scale, view);
+    const HsvScreenPoint upper_a_screen =
+        project_hsv_position(upper_a, center, scale, view);
+    const HsvScreenPoint upper_b_screen =
+        project_hsv_position(upper_b, center, scale, view);
+    draw_list->AddLine(lower_a_screen.position, lower_b_screen.position,
+                        guide_color, 1.0f);
+    draw_list->AddLine(upper_a_screen.position, upper_b_screen.position,
+                        guide_color, 1.0f);
+    if (segment % 4 == 0) {
+      draw_list->AddLine(lower_a_screen.position, upper_a_screen.position,
+                          guide_color, 1.0f);
+    }
+  }
+
+  const auto cylinder_position_at_hue = [](float hue, float saturation, float value) {
+    constexpr float kTwoPi = 6.28318530717958647692f;
+    const float angle = kTwoPi * hue;
+    return raypalette::Vec3{saturation * std::cos(angle), value,
+                saturation * std::sin(angle)};
+  };
+  const HsvScreenPoint section_bottom_center =
+    project_hsv_position({0.0f, 0.0f, 0.0f}, center, scale, view);
+  const HsvScreenPoint section_bottom_edge = project_hsv_position(
+    cylinder_position_at_hue(section.hue, 1.0f, 0.0f), center, scale, view);
+  const HsvScreenPoint section_top_edge = project_hsv_position(
+    cylinder_position_at_hue(section.hue, 1.0f, 1.0f), center, scale, view);
+  const HsvScreenPoint section_top_center =
+    project_hsv_position({0.0f, 1.0f, 0.0f}, center, scale, view);
+  const ImU32 section_color = hsv_plot_color(
+    raypalette::hsv_to_srgb({section.hue, 1.0f, 1.0f}), 0.22f);
+  draw_list->AddQuadFilled(section_bottom_center.position,
+                           section_bottom_edge.position,
+                           section_top_edge.position,
+                           section_top_center.position,
+                           section_color);
+  const ImU32 section_outline = ImGui::GetColorU32(ImGuiCol_Text);
+  draw_list->AddLine(section_bottom_center.position,
+                     section_bottom_edge.position,
+                     section_outline, 2.0f);
+  draw_list->AddLine(section_bottom_edge.position,
+                     section_top_edge.position,
+                     section_outline, 2.0f);
+  draw_list->AddLine(section_top_edge.position,
+                     section_top_center.position,
+                     section_outline, 2.0f);
+  const auto draw_section_boundary = [&](float hue) {
+    const HsvScreenPoint lower = project_hsv_position(
+      cylinder_position_at_hue(hue, 1.0f, 0.0f), center, scale, view);
+    const HsvScreenPoint upper = project_hsv_position(
+      cylinder_position_at_hue(hue, 1.0f, 1.0f), center, scale, view);
+    draw_list->AddLine(lower.position, upper.position, section_outline, 1.0f);
+  };
+  draw_section_boundary(std::fmod(section.hue - section.half_width + 1.0f, 1.0f));
+  draw_section_boundary(std::fmod(section.hue + section.half_width, 1.0f));
+
+  struct ProjectedPlotPoint {
+    HsvScreenPoint screen;
+    raypalette::Vec3 color;
+  };
+  std::vector<ProjectedPlotPoint> projected_points;
+  projected_points.reserve(points.size());
+  for (const HsvPlotPoint &point : points) {
+    projected_points.push_back(
+        {project_hsv_position(point.cylinder_position, center, scale, view),
+          point.display_color});
+  }
+  std::sort(projected_points.begin(), projected_points.end(),
+            [](const ProjectedPlotPoint &left, const ProjectedPlotPoint &right) {
+              return left.screen.depth < right.screen.depth;
+            });
+  for (const ProjectedPlotPoint &point : projected_points) {
+    draw_list->AddCircleFilled(point.screen.position, 2.5f,
+                                hsv_plot_color(point.color, 0.62f));
+  }
+
+  const auto draw_marker = [&](const char *label, const raypalette::Vec3 &color,
+                                bool diamond, float radius) {
+    const raypalette::Vec3 cylinder_position = raypalette::hsv_cylinder_position(
+        raypalette::srgb_to_hsv(color));
+    const HsvScreenPoint screen =
+        project_hsv_position(cylinder_position, center, scale, view);
+    const ImU32 marker_color = hsv_plot_color(color);
+    const ImU32 outline_color = ImGui::GetColorU32(ImGuiCol_Text);
+    if (diamond) {
+      draw_list->AddQuadFilled(
+          ImVec2(screen.position.x, screen.position.y - radius),
+          ImVec2(screen.position.x + radius, screen.position.y),
+          ImVec2(screen.position.x, screen.position.y + radius),
+          ImVec2(screen.position.x - radius, screen.position.y), marker_color);
+      draw_list->AddQuad(ImVec2(screen.position.x, screen.position.y - radius),
+                          ImVec2(screen.position.x + radius, screen.position.y),
+                          ImVec2(screen.position.x, screen.position.y + radius),
+                          ImVec2(screen.position.x - radius, screen.position.y),
+                          outline_color, 1.5f);
+    } else {
+      draw_list->AddCircleFilled(screen.position, radius, marker_color);
+      draw_list->AddCircle(screen.position, radius, outline_color, 16, 1.5f);
+    }
+    draw_list->AddText(ImVec2(screen.position.x + radius + 3.0f,
+                              screen.position.y - 7.0f),
+                        outline_color, label);
+  };
+  draw_marker("Sphere", sphere_color, true, 7.0f);
+  const float normalized_energy = light_energy_maximum > 0.0f
+      ? std::log1pf(std::max(0.0f, light_energy_value)) /
+            std::log1pf(light_energy_maximum)
+      : 0.0f;
+  draw_marker("Light", light_color_value, false, 5.0f + 6.0f * normalized_energy);
+    for (int index = 0; index < static_cast<int>(palette.size()); ++index) {
+      const raypalette::Vec3 &color = palette[index].color;
+      const HsvScreenPoint screen = project_hsv_position(
+      raypalette::hsv_cylinder_position(raypalette::srgb_to_hsv(color)),
+      center, scale, view);
+      const float radius = selected_palette_index == index ? 7.0f : 5.0f;
+      const ImU32 outline_color = ImGui::GetColorU32(ImGuiCol_Text);
+      draw_list->AddRectFilled(ImVec2(screen.position.x - radius,
+              screen.position.y - radius),
+            ImVec2(screen.position.x + radius,
+              screen.position.y + radius),
+            hsv_plot_color(color));
+      draw_list->AddRect(ImVec2(screen.position.x - radius,
+            screen.position.y - radius),
+          ImVec2(screen.position.x + radius,
+            screen.position.y + radius),
+          outline_color, 0.0f, 0, 1.5f);
+      const std::string label = "P" + std::to_string(index);
+      draw_list->AddText(ImVec2(screen.position.x + radius + 3.0f,
+            screen.position.y - 7.0f),
+          outline_color, label.c_str());
+    }
+  draw_list->AddText(ImVec2(canvas_min.x + 8.0f, canvas_min.y + 8.0f),
+                      guide_color, "HSV cylinder: H angle, S radius, V height");
+  draw_list->AddText(ImVec2(canvas_min.x + 8.0f, canvas_max.y - 22.0f),
+                      guide_color, "Base color circle: V = 1");
+}
+
+float hue_distance(float first, float second) {
+  const float direct_distance = std::fabs(first - second);
+  return std::min(direct_distance, 1.0f - direct_distance);
+}
+
+void draw_hsv_hue_section(const std::vector<HsvPlotPoint> &points,
+                          HsvHueSection &section,
+                          const raypalette::Vec3 &sphere_color,
+                          const raypalette::Vec3 &light_color_value,
+                          const std::vector<PaletteColor> &palette,
+                          int selected_palette_index) {
+  ImGui::Separator();
+  ImGui::Text("Hue section");
+  const float section_width = std::max(
+      240.0f, std::min(420.0f, ImGui::GetContentRegionAvail().x));
+  constexpr float kHueBarHeight = 18.0f;
+  ImGui::InvisibleButton("##hsv-section-hue", ImVec2(section_width, kHueBarHeight),
+                       ImGuiButtonFlags_MouseButtonLeft);
+  const ImVec2 hue_bar_min = ImGui::GetItemRectMin();
+  const ImVec2 hue_bar_max = ImGui::GetItemRectMax();
+  if (ImGui::IsItemHovered() && ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+    section.hue = std::clamp((ImGui::GetIO().MousePos.x - hue_bar_min.x) /
+                                 section_width,
+                             0.0f, 1.0f);
+  }
+
+  ImDrawList *draw_list = ImGui::GetWindowDrawList();
+  constexpr int kHueBarSegments = 48;
+  for (int segment = 0; segment < kHueBarSegments; ++segment) {
+    const float x0 = hue_bar_min.x + section_width * segment / kHueBarSegments;
+    const float x1 = hue_bar_min.x + section_width * (segment + 1) /
+                                     kHueBarSegments;
+    draw_list->AddRectFilled(
+        ImVec2(x0, hue_bar_min.y), ImVec2(x1, hue_bar_max.y),
+        hsv_plot_color(raypalette::hsv_to_srgb(
+            {static_cast<float>(segment) / kHueBarSegments, 1.0f, 1.0f})));
+  }
+  const float hue_marker_x = hue_bar_min.x + section.hue * section_width;
+  draw_list->AddLine(ImVec2(hue_marker_x, hue_bar_min.y - 2.0f),
+                     ImVec2(hue_marker_x, hue_bar_max.y + 2.0f),
+                     ImGui::GetColorU32(ImGuiCol_Text), 2.0f);
+
+  constexpr int kSaturationSteps = 48;
+  constexpr int kValueSteps = 32;
+  const float section_height = section_width * 0.52f;
+  ImGui::InvisibleButton("##hsv-section-plane",
+                       ImVec2(section_width, section_height));
+  const ImVec2 plane_min = ImGui::GetItemRectMin();
+  const ImVec2 plane_max = ImGui::GetItemRectMax();
+  for (int value_step = 0; value_step < kValueSteps; ++value_step) {
+    const float value = 1.0f -
+                        (static_cast<float>(value_step) + 0.5f) / kValueSteps;
+    const float y0 = plane_min.y + section_height * value_step / kValueSteps;
+    const float y1 = plane_min.y + section_height * (value_step + 1) /
+                                     kValueSteps;
+    for (int saturation_step = 0; saturation_step < kSaturationSteps;
+         ++saturation_step) {
+      const float saturation = (static_cast<float>(saturation_step) + 0.5f) /
+                               kSaturationSteps;
+      const float x0 = plane_min.x + section_width * saturation_step /
+                                        kSaturationSteps;
+      const float x1 = plane_min.x + section_width * (saturation_step + 1) /
+                                        kSaturationSteps;
+      draw_list->AddRectFilled(
+          ImVec2(x0, y0), ImVec2(x1, y1),
+          hsv_plot_color(raypalette::hsv_to_srgb(
+              {section.hue, saturation, value})));
+    }
+  }
+  draw_list->AddRect(plane_min, plane_max, ImGui::GetColorU32(ImGuiCol_Border));
+  for (const HsvPlotPoint &point : points) {
+    if (hue_distance(point.hsv.hue, section.hue) > section.half_width) {
+      continue;
+    }
+    const ImVec2 position(
+        plane_min.x + point.hsv.saturation * section_width,
+        plane_max.y - point.hsv.value * section_height);
+    draw_list->AddCircleFilled(position, 3.0f, hsv_plot_color(point.display_color));
+    draw_list->AddCircle(position, 3.0f, ImGui::GetColorU32(ImGuiCol_Text), 12,
+                         1.0f);
+  }
+  const auto draw_section_marker = [&](const char *label,
+                                       const raypalette::Vec3 &color,
+                                       bool diamond, float radius) {
+    const raypalette::Hsv hsv = raypalette::srgb_to_hsv(color);
+    if (hue_distance(hsv.hue, section.hue) > section.half_width) {
+      return;
+    }
+    const ImVec2 position(plane_min.x + hsv.saturation * section_width,
+                          plane_max.y - hsv.value * section_height);
+    const ImU32 outline_color = ImGui::GetColorU32(ImGuiCol_Text);
+    if (diamond) {
+      draw_list->AddQuadFilled(ImVec2(position.x, position.y - radius),
+                               ImVec2(position.x + radius, position.y),
+                               ImVec2(position.x, position.y + radius),
+                               ImVec2(position.x - radius, position.y),
+                               hsv_plot_color(color));
+      draw_list->AddQuad(ImVec2(position.x, position.y - radius),
+                         ImVec2(position.x + radius, position.y),
+                         ImVec2(position.x, position.y + radius),
+                         ImVec2(position.x - radius, position.y),
+                         outline_color, 1.5f);
+    } else {
+      draw_list->AddCircleFilled(position, radius, hsv_plot_color(color));
+      draw_list->AddCircle(position, radius, outline_color, 16, 1.5f);
+    }
+    draw_list->AddText(ImVec2(position.x + radius + 3.0f, position.y - 7.0f),
+                       outline_color, label);
+  };
+  draw_section_marker("Sphere", sphere_color, true, 7.0f);
+  draw_section_marker("Light", light_color_value, false, 6.0f);
+  for (int index = 0; index < static_cast<int>(palette.size()); ++index) {
+    const raypalette::Hsv hsv = raypalette::srgb_to_hsv(palette[index].color);
+    if (hue_distance(hsv.hue, section.hue) > section.half_width) {
+      continue;
+    }
+    const ImVec2 position(plane_min.x + hsv.saturation * section_width,
+                          plane_max.y - hsv.value * section_height);
+    const float radius = selected_palette_index == index ? 6.0f : 4.0f;
+    const ImU32 outline_color = ImGui::GetColorU32(ImGuiCol_Text);
+    draw_list->AddRectFilled(ImVec2(position.x - radius, position.y - radius),
+                             ImVec2(position.x + radius, position.y + radius),
+                             hsv_plot_color(palette[index].color));
+    draw_list->AddRect(ImVec2(position.x - radius, position.y - radius),
+                       ImVec2(position.x + radius, position.y + radius),
+                       outline_color, 0.0f, 0, 1.5f);
+    const std::string label = "P" + std::to_string(index);
+    draw_list->AddText(ImVec2(position.x + radius + 3.0f,
+                              position.y - 7.0f), outline_color, label.c_str());
+  }
+  draw_list->AddText(ImVec2(plane_min.x + 5.0f, plane_min.y + 5.0f),
+                     ImGui::GetColorU32(ImGuiCol_TextDisabled), "V");
+  draw_list->AddText(ImVec2(plane_max.x - 12.0f, plane_max.y - 20.0f),
+                     ImGui::GetColorU32(ImGuiCol_TextDisabled), "S");
+}
+
 struct MaterialUi {
   const char *const *labels;
   int label_count;
@@ -237,6 +725,9 @@ int main() {
   Texture texture;
   raypalette::Image image;
   std::vector<PaletteColor> palette;
+  std::vector<HsvPlotPoint> sphere_hsv_points;
+  HsvPlotView hsv_plot_view;
+  HsvHueSection hsv_hue_section;
   int selected_palette_index = -1;
   bool needs_render = true;
   bool needs_display_update = true;
@@ -552,10 +1043,12 @@ int main() {
     if (needs_render) {
       image = renderer.render(scene, camera, settings);
       texture.upload(image, display_settings);
+      sphere_hsv_points = make_sphere_hsv_points(texture, scene, camera, settings);
       needs_render = !renderer.is_accumulation_complete(settings);
       needs_display_update = false;
     } else if (needs_display_update) {
       texture.upload(image, display_settings);
+      sphere_hsv_points = make_sphere_hsv_points(texture, scene, camera, settings);
       needs_display_update = false;
     }
 
@@ -648,6 +1141,30 @@ int main() {
       ImGui::EndTabBar();
     }
     ImGui::End();
+
+      ImGui::SetNextWindowSize(
+        ImVec2(layout.hsv_space_panel.width, layout.hsv_space_panel.height),
+        ImGuiCond_FirstUseEver);
+      ImGui::Begin("HSV Space");
+      const raypalette::Material &sphere_material =
+        scene.materials[raypalette::kSphereMaterialIndex];
+      const raypalette::Vec3 display_sphere_color =
+        raypalette::prepare_for_display(sphere_material_color(sphere_material),
+                        display_settings.exposure_ev,
+                        display_settings.use_reinhard);
+      const raypalette::Vec3 display_light_color =
+        raypalette::prepare_for_display(light_color(scene.light),
+                        display_settings.exposure_ev,
+                        display_settings.use_reinhard);
+      const LightEnergyUi energy_ui = light_energy_ui(scene.light.type);
+      draw_hsv_space(sphere_hsv_points, display_sphere_color,
+               display_light_color, light_energy(scene.light),
+                     energy_ui.maximum, hsv_hue_section, palette,
+                     selected_palette_index, hsv_plot_view);
+      draw_hsv_hue_section(sphere_hsv_points, hsv_hue_section,
+                 display_sphere_color, display_light_color, palette,
+                 selected_palette_index);
+      ImGui::End();
 
     ImGui::Render();
     int display_width = 0;
