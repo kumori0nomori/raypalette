@@ -71,6 +71,48 @@ struct Texture {
   }
 };
 
+raypalette::Vec3 &light_color(raypalette::Light &light) {
+  switch (light.type) {
+  case raypalette::LightType::Point:
+    return light.point.color;
+  case raypalette::LightType::Directional:
+    return light.directional.color;
+  case raypalette::LightType::RectArea:
+    return light.area.color;
+  }
+  return light.point.color;
+}
+
+float &light_energy(raypalette::Light &light) {
+  switch (light.type) {
+  case raypalette::LightType::Point:
+    return light.point.radiant_intensity;
+  case raypalette::LightType::Directional:
+    return light.directional.irradiance;
+  case raypalette::LightType::RectArea:
+    return light.area.radiance;
+  }
+  return light.point.radiant_intensity;
+}
+
+struct LightEnergyUi {
+  const char *label;
+  float minimum;
+  float maximum;
+};
+
+LightEnergyUi light_energy_ui(raypalette::LightType type) {
+  switch (type) {
+  case raypalette::LightType::Point:
+    return {"Radiant intensity", 0.0f, 500.0f};
+  case raypalette::LightType::Directional:
+    return {"Sun irradiance", 0.0f, 10.0f};
+  case raypalette::LightType::RectArea:
+    return {"Area radiance", 0.0f, 50.0f};
+  }
+  return {"Light energy", 0.0f, 1.0f};
+}
+
 } // namespace
 
 int main() {
@@ -83,9 +125,9 @@ int main() {
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
   const GuiLayout &layout = kDefaultGuiLayout;
   GLFWwindow *window = glfwCreateWindow(
-      static_cast<int>(layout.main_window.width),
-      static_cast<int>(layout.main_window.height),
-      "RayPalette", nullptr, nullptr);
+    static_cast<int>(layout.main_window.width),
+    static_cast<int>(layout.main_window.height),
+    "RayPalette", nullptr, nullptr);
   if (window == nullptr) {
     glfwTerminate();
     return 1;
@@ -127,15 +169,15 @@ int main() {
       needs_render = true;
     }
     if (ImGui::ColorEdit3(
-            "Sphere color",
-            &scene.materials[raypalette::kSphereMaterialIndex].base_color.x,
-            ImGuiColorEditFlags_Float)) {
+          "Sphere color",
+          &scene.materials[raypalette::kSphereMaterialIndex].base_color.x,
+          ImGuiColorEditFlags_Float)) {
       needs_render = true;
     }
     if (ImGui::ColorEdit3(
-            "Floor color",
-            &scene.materials[raypalette::kFloorMaterialIndex].base_color.x,
-            ImGuiColorEditFlags_Float)) {
+          "Floor color",
+          &scene.materials[raypalette::kFloorMaterialIndex].base_color.x,
+          ImGuiColorEditFlags_Float)) {
       needs_render = true;
     }
     if (ImGui::ColorEdit3("Background", &scene.background_color.x,
@@ -145,36 +187,42 @@ int main() {
       scene.background_color.z = std::max(0.0f, scene.background_color.z);
       needs_render = true;
     }
+
     const char *light_types[] = {"Point", "Rectangular area", "Directional (sun)"};
     if (ImGui::Combo("Light type", &light_type_index, light_types,
                      IM_ARRAYSIZE(light_types))) {
       const raypalette::LightType type =
-          static_cast<raypalette::LightType>(light_type_index);
+        static_cast<raypalette::LightType>(light_type_index);
+      const raypalette::Vec3 color = light_color(scene.light);
+      const float energy = light_energy(scene.light);
       if (type == raypalette::LightType::Point) {
         scene.light = raypalette::make_point_light(
-            light_polar, scene.sphere.center, scene.light.color,
-            scene.light.intensity);
+          light_polar, scene.sphere.center, color, energy);
       } else if (type == raypalette::LightType::Directional) {
         scene.light = raypalette::make_directional_light(
-            light_polar.theta_degrees, light_polar.phi_degrees,
-            scene.light.color, scene.light.intensity);
+          light_polar.theta_degrees, light_polar.phi_degrees,
+          color, energy);
       } else {
         scene.light = raypalette::make_rect_area_light(
-            light_polar, scene.sphere.center, {0.0f, -1.0f, 0.0f},
-            scene.light.width, scene.light.height, scene.light.color,
-            scene.light.intensity);
+          light_polar, scene.sphere.center, {0.0f, -1.0f, 0.0f},
+          scene.light.area.width, scene.light.area.height, color, energy);
       }
       needs_render = true;
     }
 
-    if (ImGui::SliderFloat("Light intensity", &scene.light.intensity, 0.0f,
-                           500.0f)) {
+    const LightEnergyUi energy_ui = light_energy_ui(scene.light.type);
+    if (ImGui::SliderFloat(energy_ui.label, &light_energy(scene.light),
+                           energy_ui.minimum, energy_ui.maximum)) {
       needs_render = true;
     }
-    float light_color[3] = {scene.light.color.x, scene.light.color.y, scene.light.color.z};
-    if (ImGui::ColorEdit3("Light color", light_color)) {
-      scene.light.color = {std::max(0.0f, light_color[0]), std::max(0.0f, light_color[1]),
-                           std::max(0.0f, light_color[2])};
+    float light_color_values[3] = {light_color(scene.light).x,
+                                   light_color(scene.light).y,
+                                   light_color(scene.light).z};
+    if (ImGui::ColorEdit3("Light color", light_color_values)) {
+      light_color(scene.light) = {
+        std::max(0.0f, light_color_values[0]),
+        std::max(0.0f, light_color_values[1]),
+        std::max(0.0f, light_color_values[2])};
       needs_render = true;
     }
     if (ImGui::SliderInt("Samples per pixel", &settings.samples_per_pixel, 1,
@@ -185,35 +233,35 @@ int main() {
     bool light_parameters_changed = false;
     if (scene.light.type != raypalette::LightType::Directional) {
       light_parameters_changed |=
-          ImGui::SliderFloat("Light radius", &light_polar.radius, 0.1f, 20.0f);
+        ImGui::SliderFloat("Light radius", &light_polar.radius, 0.1f, 20.0f);
     } else {
       ImGui::TextDisabled("Sun light has no radius or distance falloff.");
     }
     light_parameters_changed |= ImGui::SliderFloat(
-        "Light theta", &light_polar.theta_degrees, 0.0f, 90.0f);
+      "Light theta", &light_polar.theta_degrees, 0.0f, 90.0f);
     light_parameters_changed |= ImGui::SliderFloat(
-        "Light phi", &light_polar.phi_degrees, -180.0f, 180.0f);
+      "Light phi", &light_polar.phi_degrees, -180.0f, 180.0f);
     if (scene.light.type == raypalette::LightType::RectArea) {
       light_parameters_changed |=
-          ImGui::SliderFloat("Area width", &scene.light.width, 0.1f, 20.0f);
+        ImGui::SliderFloat("Area width", &scene.light.area.width, 0.1f, 20.0f);
       light_parameters_changed |=
-          ImGui::SliderFloat("Area height", &scene.light.height, 0.1f, 20.0f);
+        ImGui::SliderFloat("Area height", &scene.light.area.height, 0.1f, 20.0f);
       ImGui::TextDisabled("Area-light sampling is not implemented yet.");
     }
     if (light_parameters_changed) {
+      const raypalette::Vec3 color = light_color(scene.light);
+      const float energy = light_energy(scene.light);
       if (scene.light.type == raypalette::LightType::Point) {
         scene.light = raypalette::make_point_light(
-            light_polar, scene.sphere.center, scene.light.color,
-            scene.light.intensity);
+          light_polar, scene.sphere.center, color, energy);
       } else if (scene.light.type == raypalette::LightType::Directional) {
         scene.light = raypalette::make_directional_light(
-            light_polar.theta_degrees, light_polar.phi_degrees,
-            scene.light.color, scene.light.intensity);
+          light_polar.theta_degrees, light_polar.phi_degrees,
+          color, energy);
       } else {
         scene.light = raypalette::make_rect_area_light(
-            light_polar, scene.sphere.center, scene.light.area_normal,
-            scene.light.width, scene.light.height, scene.light.color,
-            scene.light.intensity);
+          light_polar, scene.sphere.center, scene.light.area.normal,
+          scene.light.area.width, scene.light.area.height, color, energy);
       }
       needs_render = true;
     }

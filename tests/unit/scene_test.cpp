@@ -36,31 +36,31 @@ TEST(Light, ConvertsPointLightPolarPositionAroundSphereCenter) {
                                        {1.0f, 0.5f, 0.25f}, 50.0f);
 
   EXPECT_EQ(light.type, LightType::Point);
-  EXPECT_NEAR(light.position.x, 0.0f, 1.0e-6f);
-  EXPECT_NEAR(light.position.y, 3.0f, 1.0e-6f);
-  EXPECT_NEAR(light.position.z, 0.0f, 1.0e-6f);
+  EXPECT_NEAR(light.point.position.x, 0.0f, 1.0e-6f);
+  EXPECT_NEAR(light.point.position.y, 3.0f, 1.0e-6f);
+  EXPECT_NEAR(light.point.position.z, 0.0f, 1.0e-6f);
   EXPECT_TRUE(is_valid_light(light));
 }
 
 TEST(Light, RejectsInvalidColorAndIntensity) {
   Light invalid_color;
-  invalid_color.color = {-0.1f, 1.0f, 1.0f};
+  invalid_color.point.color = {-0.1f, 1.0f, 1.0f};
   EXPECT_FALSE(is_valid_light(invalid_color));
 
   Light invalid_intensity;
-  invalid_intensity.intensity = -1.0f;
+  invalid_intensity.point.radiant_intensity = -1.0f;
   EXPECT_FALSE(is_valid_light(invalid_intensity));
 
   Light invalid_position;
-  invalid_position.position.x = std::numeric_limits<float>::infinity();
+  invalid_position.point.position.x = std::numeric_limits<float>::infinity();
   EXPECT_FALSE(is_valid_light(invalid_position));
 }
 
 TEST(Light, SamplesPointLightDirectionAndInverseSquareRadiance) {
   Light light;
-  light.position = {0.0f, 4.0f, 0.0f};
-  light.color = {1.0f, 0.5f, 0.25f};
-  light.intensity = 16.0f;
+  light.point.position = {0.0f, 4.0f, 0.0f};
+  light.point.color = {1.0f, 0.5f, 0.25f};
+  light.point.radiant_intensity = 16.0f;
   LightSample near_sample;
   LightSample far_sample;
 
@@ -77,10 +77,10 @@ TEST(Light, SamplesPointLightDirectionAndInverseSquareRadiance) {
 
 TEST(Light, RejectsSurfaceAtPointLightPosition) {
   Light light;
-  light.position = {1.0f, 2.0f, 3.0f};
+  light.point.position = {1.0f, 2.0f, 3.0f};
   LightSample sample;
 
-  EXPECT_FALSE(sample_light(light, light.position, sample));
+  EXPECT_FALSE(sample_light(light, light.point.position, sample));
 }
 
 TEST(Light, CreatesDirectionalLightFromPolarDirection) {
@@ -90,7 +90,7 @@ TEST(Light, CreatesDirectionalLightFromPolarDirection) {
 
   ASSERT_TRUE(sample_light(light, {12.0f, -3.0f, 8.0f}, sample));
   EXPECT_EQ(light.type, LightType::Directional);
-  EXPECT_NEAR(length(light.direction_to_light), 1.0f, 1.0e-6f);
+  EXPECT_NEAR(length(light.directional.direction_to_light), 1.0f, 1.0e-6f);
   EXPECT_NEAR(sample.direction_to_light.x, 1.0f, 1.0e-6f);
   EXPECT_NEAR(sample.direction_to_light.y, 0.0f, 1.0e-6f);
   EXPECT_NEAR(sample.radiance.x, 3.0f, 1.0e-6f);
@@ -108,7 +108,7 @@ TEST(Light, ValidatesRectAreaParametersWithoutSampling) {
   EXPECT_FALSE(sample_light(light, {}, sample));
 
   Light invalid_light = light;
-  invalid_light.width = 0.0f;
+  invalid_light.area.width = 0.0f;
   EXPECT_FALSE(is_valid_light(invalid_light));
 }
 
