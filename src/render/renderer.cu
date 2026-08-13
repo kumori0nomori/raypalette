@@ -32,8 +32,12 @@ __device__ Vec3 shade(const Scene &scene,
                       const HitRecord &record,
                       float minimum_distance) {
   const Material &material = scene.materials[record.material_index];
+  const Vec3 emitted = material.emission_color * material.emission_strength;
+  if (material.type == MaterialType::Emissive) {
+    return emitted;
+  }
   if (material.type != MaterialType::Diffuse) {
-    return {};
+    return emitted;
   }
 
   const Vec3 ambient = material.base_color * scene.environment.color *
@@ -73,7 +77,7 @@ __device__ Vec3 shade(const Scene &scene,
   if (scene.light.type == LightType::RectArea) {
     direct_light *= 1.0f / area_sample_count;
   }
-  return ambient + direct_light;
+  return emitted + ambient + direct_light;
 }
 
 // Function to generate a pseudo-random sample value

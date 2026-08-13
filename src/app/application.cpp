@@ -184,6 +184,27 @@ int main() {
           ImGuiColorEditFlags_Float)) {
       request_render();
     }
+    if (ImGui::ColorEdit3(
+        "Sphere emission",
+        &scene.materials[raypalette::kSphereMaterialIndex].emission_color.x,
+        ImGuiColorEditFlags_Float)) {
+      scene.materials[raypalette::kSphereMaterialIndex].emission_color.x =
+        std::max(0.0f, scene.materials[raypalette::kSphereMaterialIndex]
+                   .emission_color.x);
+      scene.materials[raypalette::kSphereMaterialIndex].emission_color.y =
+        std::max(0.0f, scene.materials[raypalette::kSphereMaterialIndex]
+                   .emission_color.y);
+      scene.materials[raypalette::kSphereMaterialIndex].emission_color.z =
+        std::max(0.0f, scene.materials[raypalette::kSphereMaterialIndex]
+                   .emission_color.z);
+      request_render();
+    }
+    if (ImGui::SliderFloat(
+        "Sphere emission strength",
+        &scene.materials[raypalette::kSphereMaterialIndex].emission_strength,
+        0.0f, 10.0f)) {
+      request_render();
+    }
     if (ImGui::ColorEdit3("Background", &scene.background_color.x,
                           ImGuiColorEditFlags_Float)) {
       scene.background_color.x = std::max(0.0f, scene.background_color.x);

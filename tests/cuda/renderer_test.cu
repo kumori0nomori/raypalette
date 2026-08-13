@@ -85,5 +85,28 @@ TEST(CudaRenderer, AccumulatesProgressiveFrames) {
   EXPECT_TRUE(renderer.is_accumulation_complete(settings));
 }
 
+TEST(CudaRenderer, RendersEmissionWithoutDirectLight) {
+  if (!has_cuda_device()) {
+    GTEST_SKIP() << "No CUDA-capable device is available";
+  }
+  Scene scene = make_default_scene();
+  Material &sphere_material = scene.materials[kSphereMaterialIndex];
+  sphere_material.type = MaterialType::Emissive;
+  sphere_material.base_color = {};
+  sphere_material.emission_color = {0.2f, 0.4f, 0.8f};
+  sphere_material.emission_strength = 2.0f;
+  scene.environment.intensity = 0.0f;
+  scene.light.point.radiant_intensity = 0.0f;
+
+  Renderer renderer;
+  const Image image = renderer.render(scene, make_default_camera(1.0f),
+                                      {32, 32, 0.001f, 1, 1});
+  const Vec3 &center_pixel = image.pixels[16 * image.width + 16];
+
+  EXPECT_NEAR(center_pixel.x, 0.4f, 1.0e-5f);
+  EXPECT_NEAR(center_pixel.y, 0.8f, 1.0e-5f);
+  EXPECT_NEAR(center_pixel.z, 1.6f, 1.0e-5f);
+}
+
 } // namespace
 } // namespace raypalette
