@@ -126,6 +126,8 @@ TEST(Scene, CreatesCanonicalSphereAndFloor) {
   EXPECT_TRUE(is_valid_material(scene.materials[kFloorMaterialIndex]));
   EXPECT_EQ(scene.light.type, LightType::Point);
   EXPECT_TRUE(is_valid_light(scene.light));
+  EXPECT_TRUE(is_unit_color(scene.environment.color));
+  EXPECT_FLOAT_EQ(scene.environment.intensity, 0.08f);
   EXPECT_TRUE(is_valid_scene(scene));
 }
 
@@ -138,6 +140,17 @@ TEST(Scene, AllowsHdrDisplayBackgroundButRejectsInvalidValues) {
   EXPECT_FALSE(is_valid_scene(scene));
 
   scene.background_color.x = std::numeric_limits<float>::infinity();
+  EXPECT_FALSE(is_valid_scene(scene));
+}
+
+TEST(Scene, RejectsInvalidEnvironmentLight) {
+  Scene scene = make_default_scene();
+
+  scene.environment.color = {-0.1f, 1.0f, 1.0f};
+  EXPECT_FALSE(is_valid_scene(scene));
+
+  scene = make_default_scene();
+  scene.environment.intensity = -0.1f;
   EXPECT_FALSE(is_valid_scene(scene));
 }
 

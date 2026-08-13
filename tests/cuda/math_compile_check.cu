@@ -27,7 +27,7 @@ __global__ void math_compile_check_kernel(Vec3 *output) {
                                                 {0.0f, -1.0f, 0.0f}, 1.0f, 1.0f,
                                                 {1.0f, 1.0f, 1.0f}, 100.0f);
   const Scene scene{{material, material}, sphere, floor, point_light,
-                    {0.05f, 0.05f, 0.05f}};
+                    {{1.0f, 1.0f, 1.0f}, 0.08f}, {0.05f, 0.05f, 0.05f}};
   LightSample light_sample;
   if (!is_valid_material(material) ||
       !sample_light(point_light, sphere.center, light_sample) ||

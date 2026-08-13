@@ -187,6 +187,17 @@ int main() {
       scene.background_color.z = std::max(0.0f, scene.background_color.z);
       needs_render = true;
     }
+    if (ImGui::ColorEdit3("Environment color", &scene.environment.color.x,
+                          ImGuiColorEditFlags_Float)) {
+      scene.environment.color.x = std::max(0.0f, scene.environment.color.x);
+      scene.environment.color.y = std::max(0.0f, scene.environment.color.y);
+      scene.environment.color.z = std::max(0.0f, scene.environment.color.z);
+      needs_render = true;
+    }
+    if (ImGui::SliderFloat("Environment intensity",
+                           &scene.environment.intensity, 0.0f, 1.0f)) {
+      needs_render = true;
+    }
 
     const char *light_types[] = {"Point", "Rectangular area", "Directional (sun)"};
     if (ImGui::Combo("Light type", &light_type_index, light_types,

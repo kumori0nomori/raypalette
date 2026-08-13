@@ -36,14 +36,16 @@ __device__ Vec3 shade(const Scene &scene,
     return {};
   }
 
+  const Vec3 ambient = material.base_color * scene.environment.color *
+                       scene.environment.intensity;
   LightSample light_sample;
   if (!sample_light(scene.light, record.position, light_sample)) {
-    return {};
+    return ambient;
   }
 
   const float cosine = fmaxf(0.0f, dot(record.normal, light_sample.direction_to_light));
   if (cosine <= 0.0f) {
-    return {};
+    return ambient;
   }
 
   const Ray shadow_ray{record.position + minimum_distance * record.normal,
@@ -51,9 +53,9 @@ __device__ Vec3 shade(const Scene &scene,
   HitRecord shadow_record;
   if (hit_scene(scene, shadow_ray, minimum_distance, light_sample.distance,
                 shadow_record)) {
-    return {};
+    return ambient;
   }
-  return material.base_color * light_sample.radiance * cosine;
+  return ambient + material.base_color * light_sample.radiance * cosine;
 }
 
 __global__ void render_kernel(Vec3 *pixels,
