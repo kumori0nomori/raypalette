@@ -66,6 +66,17 @@ TEST(Material, AppliesBeerLambertAbsorption) {
   EXPECT_NEAR(tinted.z, 0.0625f, 1.0e-6f);
 }
 
+TEST(Material, ColoredGlassAttenuatesChannelsIndependently) {
+  const Vec3 attenuation =
+      beer_lambert_attenuation({0.8f, 0.4f, 0.2f}, 1.0f, 2.0f);
+
+  EXPECT_NEAR(attenuation.x, 0.64f, 1.0e-5f);
+  EXPECT_NEAR(attenuation.y, 0.16f, 1.0e-5f);
+  EXPECT_NEAR(attenuation.z, 0.04f, 1.0e-5f);
+  EXPECT_GT(attenuation.x, attenuation.y);
+  EXPECT_GT(attenuation.y, attenuation.z);
+}
+
 TEST(Material, RoughnessChangesGgxDistribution) {
   const float smooth = ggx_distribution(1.0f, 0.1f);
   const float rough = ggx_distribution(1.0f, 0.9f);

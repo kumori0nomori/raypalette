@@ -152,5 +152,33 @@ TEST(CudaRenderer, RendersGlassMaterial) {
   }
 }
 
+TEST(CudaRenderer, RendersColoredGlassWithFinitePixels) {
+  if (!has_cuda_device()) {
+    GTEST_SKIP() << "No CUDA-capable device is available";
+  }
+  Scene scene = make_default_scene();
+  Material &sphere_material = scene.materials[kSphereMaterialIndex];
+  sphere_material.type = MaterialType::Dielectric;
+  sphere_material.index_of_refraction = 1.5f;
+  sphere_material.base_color = {1.0f, 1.0f, 1.0f};
+  sphere_material.transmission_color = {0.9f, 0.35f, 0.1f};
+  sphere_material.absorption_density = 1.5f;
+
+  Renderer renderer;
+  const Image image = renderer.render(scene, make_default_camera(1.0f),
+                                      {32, 32, 0.001f, 2, 2, 3});
+  bool has_channel_difference = false;
+  for (const Vec3 &pixel : image.pixels) {
+    EXPECT_TRUE(std::isfinite(pixel.x));
+    EXPECT_TRUE(std::isfinite(pixel.y));
+    EXPECT_TRUE(std::isfinite(pixel.z));
+    if (fabsf(pixel.x - pixel.z) > 1.0e-4f ||
+        fabsf(pixel.y - pixel.z) > 1.0e-4f) {
+      has_channel_difference = true;
+    }
+  }
+  EXPECT_TRUE(has_channel_difference);
+}
+
 } // namespace
 } // namespace raypalette
