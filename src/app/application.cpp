@@ -90,10 +90,6 @@ int main() {
 
     ImGui::Begin("RayPalette Controls");
     ImGui::Text("Deterministic CUDA preview");
-    if (ImGui::Button("Render")) {
-      needs_render = true;
-    }
-    ImGui::SameLine();
     if (ImGui::Button("Reset scene")) {
       scene = raypalette::make_default_scene();
       needs_render = true;
