@@ -8,7 +8,9 @@
 #include "imgui.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <iterator>
 #include <stdexcept>
 #include <string>
@@ -33,6 +35,30 @@ struct DisplaySettings {
   float exposure_ev = 0.0f;
   bool use_reinhard = true;
 };
+
+struct PaletteColor {
+  raypalette::Vec3 color;
+  std::string hex;
+  float u = 0.0f;
+  float v = 0.0f;
+};
+
+std::string color_to_hex(const raypalette::Vec3 &color) {
+  const auto to_byte = [](float value) {
+    return static_cast<int>(std::round(
+        std::clamp(value, 0.0f, 1.0f) * 255.0f));
+  };
+
+  char buffer[8];
+  std::snprintf(buffer, sizeof(buffer), "#%02X%02X%02X", to_byte(color.x),
+                to_byte(color.y), to_byte(color.z));
+  return buffer;
+}
+
+bool same_palette_color(const raypalette::Vec3 &left,
+                        const raypalette::Vec3 &right) {
+  return color_to_hex(left) == color_to_hex(right);
+}
 
 struct Texture {
   GLuint id = 0;
@@ -210,10 +236,17 @@ int main() {
   raypalette::Renderer renderer;
   Texture texture;
   raypalette::Image image;
+  std::vector<PaletteColor> palette;
+  int selected_palette_index = -1;
   bool needs_render = true;
   bool needs_display_update = true;
+  auto clear_palette = [&]() {
+    palette.clear();
+    selected_palette_index = -1;
+  };
   auto request_render = [&]() {
     renderer.reset_accumulation();
+    clear_palette();
     needs_render = true;
   };
   float settings_panel_right = 0.0f;
@@ -250,6 +283,8 @@ int main() {
       light_type_index = static_cast<int>(scene.light.type);
       camera_distance = 5.0f;
       camera = raypalette::make_default_camera(1.0f, camera_distance);
+      palette.clear();
+      selected_palette_index = -1;
       request_render();
     }
 
@@ -475,10 +510,12 @@ int main() {
       }
       if (ImGui::SliderFloat("Exposure (EV)", &display_settings.exposure_ev,
                             -4.0f, 4.0f)) {
+        clear_palette();
         needs_display_update = true;
       }
       if (ImGui::Checkbox("Reinhard tone mapping",
                           &display_settings.use_reinhard)) {
+        clear_palette();
         needs_display_update = true;
       }
       if (ImGui::SliderFloat("Camera distance", &camera_distance, 2.0f,
@@ -508,6 +545,85 @@ int main() {
       ImGui::Image(reinterpret_cast<ImTextureID>(static_cast<std::intptr_t>(texture.id)),
                    ImVec2(static_cast<float>(image.width), static_cast<float>(image.height)),
                    ImVec2(0.0f, 1.0f), ImVec2(1.0f, 0.0f));
+
+      const ImVec2 image_min = ImGui::GetItemRectMin();
+      const ImVec2 image_max = ImGui::GetItemRectMax();
+      if (ImGui::IsItemHovered() &&
+          ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+        const ImVec2 mouse = ImGui::GetIO().MousePos;
+        const float u = (mouse.x - image_min.x) /
+                        (image_max.x - image_min.x);
+        const float v = (mouse.y - image_min.y) /
+                        (image_max.y - image_min.y);
+        const int pixel_x = static_cast<int>(u * image.width);
+        const int pixel_y = image.height - 1 -
+                            static_cast<int>(v * image.height);
+        if (pixel_x >= 0 && pixel_x < image.width && pixel_y >= 0 &&
+            pixel_y < image.height) {
+          const raypalette::Vec3 picked_color =
+              texture.display_pixels[pixel_y * image.width + pixel_x];
+          if (palette.size() < 16) {
+            bool already_added = false;
+            for (const PaletteColor &entry : palette) {
+              already_added = already_added ||
+                              same_palette_color(entry.color, picked_color);
+            }
+            if (!already_added) {
+              palette.push_back({picked_color, color_to_hex(picked_color), u, v});
+              selected_palette_index = static_cast<int>(palette.size()) - 1;
+            }
+          }
+        }
+      }
+
+      ImDrawList *draw_list = ImGui::GetWindowDrawList();
+      for (int index = 0; index < static_cast<int>(palette.size()); ++index) {
+        const PaletteColor &entry = palette[index];
+        const ImVec2 pin_position(
+            image_min.x + entry.u * (image_max.x - image_min.x),
+            image_min.y + entry.v * (image_max.y - image_min.y));
+        const bool selected = selected_palette_index == index;
+        const ImU32 pin_color = ImGui::GetColorU32(
+            selected ? ImGuiCol_PlotHistogram : ImGuiCol_Text);
+        draw_list->AddCircleFilled(pin_position, selected ? 6.0f : 5.0f,
+                                   pin_color);
+        draw_list->AddCircle(pin_position, selected ? 9.0f : 8.0f,
+                             ImGui::GetColorU32(ImGuiCol_WindowBg), 16, 2.0f);
+        draw_list->AddText(ImVec2(pin_position.x + 8.0f,
+                                  pin_position.y - 8.0f),
+                           pin_color, std::to_string(index).c_str());
+      }
+    }
+    if (ImGui::BeginTabBar("PreviewTabs")) {
+      if (ImGui::BeginTabItem("Palette")) {
+        if (ImGui::Button("Clear palette")) {
+          palette.clear();
+          selected_palette_index = -1;
+        }
+        for (int index = 0; index < static_cast<int>(palette.size()); ++index) {
+          ImGui::PushID(index);
+          const PaletteColor &entry = palette[index];
+          ImGui::Text("%d", index);
+          ImGui::SameLine();
+          const ImVec4 swatch(entry.color.x, entry.color.y, entry.color.z, 1.0f);
+          ImGui::ColorButton("##swatch", swatch,
+                             ImGuiColorEditFlags_NoTooltip,
+                             ImVec2(32.0f, 24.0f));
+          ImGui::SameLine();
+          if (ImGui::Selectable(entry.hex.c_str(),
+                                selected_palette_index == index,
+                                ImGuiSelectableFlags_AllowDoubleClick)) {
+            selected_palette_index = index;
+          }
+          if (selected_palette_index == index && ImGui::GetIO().KeyCtrl &&
+              ImGui::IsKeyPressed(ImGuiKey_C)) {
+            ImGui::SetClipboardText(entry.hex.c_str());
+          }
+          ImGui::PopID();
+        }
+        ImGui::EndTabItem();
+      }
+      ImGui::EndTabBar();
     }
     ImGui::End();
 
