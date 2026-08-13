@@ -48,7 +48,10 @@ TEST(Material, ComputesRefractionAndFresnel) {
   EXPECT_TRUE(refract_direction({0.0f, -1.0f, 0.0f}, {0.0f, 1.0f, 0.0f},
                                 1.0f / 1.5f, refracted));
   EXPECT_NEAR(refracted.y, -1.0f, 1.0e-6f);
+  EXPECT_NEAR(schlick_reflectance(1.0f, 1.0f / 1.5f), 0.04f, 1.0e-6f);
   EXPECT_NEAR(schlick_reflectance(1.0f, 1.5f), 0.04f, 1.0e-6f);
+  EXPECT_FALSE(refract_direction({0.8660254f, 0.0f, 0.5f},
+                                 {0.0f, 0.0f, -1.0f}, 1.5f, refracted));
 }
 
 TEST(Material, AppliesBeerLambertAbsorption) {

@@ -193,8 +193,7 @@ __device__ Vec3 shade_dielectric(const Scene &scene, const Ray &ray,
                               ? 1.0f / material.index_of_refraction
                               : material.index_of_refraction;
   const bool total_internal_reflection = eta_ratio * sin_theta > 1.0f;
-  const float reflectance = schlick_reflectance(cos_theta,
-                                                material.index_of_refraction);
+  const float reflectance = schlick_reflectance(cos_theta, eta_ratio);
   const bool reflect = total_internal_reflection || random_value < reflectance;
 
   Vec3 direction;

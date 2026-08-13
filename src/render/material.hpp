@@ -73,11 +73,11 @@ RAYPALETTE_HOST_DEVICE inline Vec3 beer_lambert_attenuation(const Vec3 &transmis
 // Dielectric (glass) reflectance probability from IOR using Schlick's approximation.
 // Returns a scalar used to choose reflection versus refraction.
 // R(theta) = R0 + (1 - R0) * (1 - cos(theta))^5
-// where R0 = ((1- eta) / (1 + eta))^2
+// where R0 = ((1- eta_ratio) / (1 + eta_ratio))^2.
 RAYPALETTE_HOST_DEVICE inline float schlick_reflectance(float cosine,
-                                                        float index_of_refraction) {
-  float reflectance = (1.0f - index_of_refraction) /
-                      (1.0f + index_of_refraction);
+                                                        float eta_ratio) {
+  float reflectance = (1.0f - eta_ratio) /
+                      (1.0f + eta_ratio);
   reflectance *= reflectance;
   return reflectance + (1.0f - reflectance) * powf(1.0f - cosine, 5.0f);
 }
