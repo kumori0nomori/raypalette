@@ -277,7 +277,7 @@ __device__ void scatter_dielectric(const Ray &ray,
                                     direction)) {
     direction = reflect_direction(unit_direction, record.normal);
   }
-  throughput_factor = material.base_color;
+  throughput_factor = {1.0f, 1.0f, 1.0f};
   if (!record.front_face) {
     throughput_factor = throughput_factor * beer_lambert_attenuation(
         material.transmission_color,

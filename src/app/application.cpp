@@ -292,19 +292,32 @@ int main() {
     const ImVec2 sphere_panel_start = begin_settings_panel();
     if (ImGui::CollapsingHeader("Sphere & Materials",
                                 ImGuiTreeNodeFlags_DefaultOpen)) {
-      if (ImGui::ColorEdit3(
-            "Sphere color",
-            &scene.materials[raypalette::kSphereMaterialIndex].base_color.x,
-            ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs)) {
-        request_render();
+      raypalette::Material &sphere_material =
+        scene.materials[raypalette::kSphereMaterialIndex];
+      if (sphere_material.type != raypalette::MaterialType::Dielectric) {
+        if (ImGui::ColorEdit3(
+              "Sphere color", &sphere_material.base_color.x,
+              ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs)) {
+          request_render();
+        }
       }
       int sphere_material_index = material_type_index(
-        scene.materials[raypalette::kSphereMaterialIndex].type);
+        sphere_material.type);
       if (ImGui::Combo("Sphere material", &sphere_material_index,
-                      kSphereMaterialUi.labels,
-                      kSphereMaterialUi.label_count)) {
-        scene.materials[raypalette::kSphereMaterialIndex].type =
+                       kSphereMaterialUi.labels,
+                       kSphereMaterialUi.label_count)) {
+        const raypalette::MaterialType previous_type = sphere_material.type;
+        const raypalette::MaterialType next_type =
           material_type_from_index(sphere_material_index);
+        if (next_type == raypalette::MaterialType::Dielectric &&
+            previous_type != raypalette::MaterialType::Dielectric) {
+          sphere_material.transmission_color = sphere_material.base_color;
+          sphere_material.base_color = {1.0f, 1.0f, 1.0f};
+        } else if (previous_type == raypalette::MaterialType::Dielectric &&
+                   next_type != raypalette::MaterialType::Dielectric) {
+          sphere_material.base_color = sphere_material.transmission_color;
+        }
+        sphere_material.type = next_type;
         request_render();
       }
       if (scene.materials[raypalette::kSphereMaterialIndex].type ==
