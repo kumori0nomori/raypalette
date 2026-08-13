@@ -60,6 +60,16 @@ Debug の bootstrap 実行ファイルは次のように起動します。
 ./build/linux-debug/raypalette
 ```
 
+GUI をビルドする場合は、Ubuntu の X11/OpenGL 開発パッケージをインストールした
+うえで、GUI 用 preset を使用します。初回の構成では FetchContent による依存ライブラリ
+のダウンロードが発生します。
+
+```sh
+cmake --preset linux-gui-debug
+cmake --build --preset linux-gui-debug
+./build/linux-gui-debug/raypalette_gui
+```
+
 ### 2.2. Windows 11（未検証）
 
 Visual Studio 2022 の「Developer PowerShell for VS 2022」または同等の開発者用
@@ -86,7 +96,55 @@ bootstrap 実行ファイルは次のパスになります。
 .\build\windows-debug\Debug\raypalette.exe
 ```
 
-## 3. 依存ライブラリ
+GUI は Windows 用 preset で構成・ビルドします。Visual Studio 2022 の Developer
+PowerShell から実行してください。
+
+```powershell
+cmake --preset windows-gui-debug
+cmake --build --preset windows-gui-debug
+.\build\windows-gui-debug\Debug\raypalette_gui.exe
+```
+
+## 3. テスト
+
+テストは CTest に登録されています。構成とビルドを完了した後、次のコマンドで
+すべてのテストを実行します。
+
+### 3.1. Ubuntu 24.04（確認済み）
+
+```sh
+ctest --preset linux-debug --output-on-failure
+```
+
+Release ビルドでは `linux-release` を使用します。
+
+```sh
+ctest --preset linux-release --output-on-failure
+```
+
+特定のテスト群だけを実行する場合は、`-R` に正規表現を指定します。
+
+```sh
+ctest --preset linux-debug -R Vec3 --output-on-failure
+```
+
+現在は、ベクトル・色・極座標の GoogleTest unit test と、共有数学ヘッダを
+`nvcc` で検査する CUDA コンパイルチェックを実行します。CUDA コンパイルチェックは
+ビルド時に実行され、CTest のテスト一覧には含まれません。
+
+### 3.2. Windows 11（未検証）
+
+```powershell
+ctest --preset windows-debug --output-on-failure
+```
+
+Release ビルドでは `windows-release` を使用します。
+
+```powershell
+ctest --preset windows-release --output-on-failure
+```
+
+## 4. 依存ライブラリ
 
 Dear ImGui、GLFW、GoogleTest は、CMake の `FetchContent` を通じて
 `cmake/Dependencies.cmake` に不変の上流コミット SHA で定義しています。
@@ -94,3 +152,11 @@ Dear ImGui、GLFW、GoogleTest は、CMake の `FetchContent` を通じて
 ダウンロードされます。初回のダウンロードにはネットワーク接続が必要ですが、
 以降は CMake がビルドツリー内に展開したキャッシュを再利用します。Ubuntu では、
 先に上記の GUI 用パッケージをインストールしてから有効にしてください。
+
+## 5. 実行結果
+左のRayPalette Controlsでシーンの設定を行うと、その結果は逐次右画面のPreviewへと反映されます。
+またPreview画面でマウスをクリックするとその下側のPaletteにそのuv位置の色を追加します。
+Paletteを選択して`Ctrl+C`を行うことで貼り付けすることが可能です。
+このPaletteはシーンの設定を変えるたびにリセットされます。
+
+- <img src="./assets/screenshots/20260813_gui.png" alt="実行画面画像" title="実行画面" width="50%">

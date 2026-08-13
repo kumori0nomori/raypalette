@@ -1,0 +1,67 @@
+#pragma once
+
+#include "math/vec3.hpp"
+
+namespace raypalette {
+
+RAYPALETTE_HOST_DEVICE constexpr float clamp_unit(float value) {
+  return value < 0.0f ? 0.0f : (value > 1.0f ? 1.0f : value);
+}
+
+RAYPALETTE_HOST_DEVICE inline bool is_unit_color(const Vec3 &color) {
+  return is_finite(color) && color.x >= 0.0f && color.x <= 1.0f &&
+         color.y >= 0.0f && color.y <= 1.0f && color.z >= 0.0f &&
+         color.z <= 1.0f;
+}
+
+RAYPALETTE_HOST_DEVICE inline bool is_nonnegative_color(const Vec3 &color) {
+  return is_finite(color) && color.x >= 0.0f && color.y >= 0.0f &&
+         color.z >= 0.0f;
+}
+
+RAYPALETTE_HOST_DEVICE inline float srgb_to_linear_component(float value) {
+  const float clamped = clamp_unit(value);
+  return clamped <= 0.04045f 
+         ? clamped / 12.92f
+         : powf((clamped + 0.055f) / 1.055f, 2.4f);
+}
+
+RAYPALETTE_HOST_DEVICE inline float linear_to_srgb_component(float value) {
+  const float clamped = clamp_unit(value);
+  return clamped <= 0.0031308f 
+         ? 12.92f * clamped
+         : 1.055f * powf(clamped, 1.0f / 2.4f) - 0.055f;
+}
+
+RAYPALETTE_HOST_DEVICE inline Vec3 srgb_to_linear(const Vec3 &color) {
+  return {srgb_to_linear_component(color.x),
+          srgb_to_linear_component(color.y),
+          srgb_to_linear_component(color.z)};
+}
+
+RAYPALETTE_HOST_DEVICE inline Vec3 linear_to_srgb(const Vec3 &color) {
+  return {linear_to_srgb_component(color.x),
+          linear_to_srgb_component(color.y),
+          linear_to_srgb_component(color.z)};
+}
+
+RAYPALETTE_HOST_DEVICE inline Vec3 apply_exposure(const Vec3 &color,
+                                                  float exposure_stops) {
+  return color * exp2f(exposure_stops);
+}
+
+RAYPALETTE_HOST_DEVICE inline Vec3 reinhard_tonemap(const Vec3 &color) {
+  return {color.x / (1.0f + color.x), color.y / (1.0f + color.y),
+          color.z / (1.0f + color.z)};
+}
+
+RAYPALETTE_HOST_DEVICE inline Vec3 prepare_for_display(
+    const Vec3 &linear_color, float exposure_stops, bool use_reinhard) {
+  Vec3 exposed = apply_exposure(linear_color, exposure_stops);
+  if (use_reinhard) {
+    exposed = reinhard_tonemap(exposed);
+  }
+  return linear_to_srgb(exposed);
+}
+
+} // namespace raypalette
