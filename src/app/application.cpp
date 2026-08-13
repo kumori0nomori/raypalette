@@ -1,4 +1,5 @@
 #include "render/renderer.hpp"
+#include "math/color.hpp"
 
 #include <GLFW/glfw3.h>
 
@@ -10,6 +11,7 @@
 #include <cstdint>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -17,6 +19,7 @@ struct Texture {
   GLuint id = 0;
   int width = 0;
   int height = 0;
+  std::vector<raypalette::Vec3> display_pixels;
 
   void create(int new_width, int new_height) {
     width = new_width;
@@ -37,9 +40,14 @@ struct Texture {
     if (image.width != width || image.height != height) {
       create(image.width, image.height);
     }
+    // Convert linear color to sRGB for display.
+    display_pixels.resize(image.pixels.size());
+    for (std::size_t index = 0; index < image.pixels.size(); ++index) {
+      display_pixels[index] = raypalette::linear_to_srgb(image.pixels[index]);
+    }
     glBindTexture(GL_TEXTURE_2D, id);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image.width, image.height, GL_RGB,
-                    GL_FLOAT, image.pixels.data());
+                    GL_FLOAT, display_pixels.data());
   }
 
   void destroy() {
