@@ -38,6 +38,8 @@ __device__ float sample_unit(unsigned int pixel_index,
                              unsigned int sample_index,
                              unsigned int channel);
 
+__device__ unsigned int sample_hash(unsigned int value);
+
 constexpr int kAreaLightSampleCount = 4;
 
 __device__ Vec3 emitted_radiance(const Material &material) {
@@ -88,13 +90,14 @@ __device__ bool try_sample_light(const Scene &scene,
   return false;
 }
 
+// Samples the single scene sphere as an emissive surface.
 __device__ bool try_sample_emissive_sphere(const Scene &scene,
                                            const HitRecord &record,
                                            int sample_index,
                                            LightSample &sample) {
-  // Check if the sphere is emissive and the sample index is valid.
+  const Material &emissive = scene.materials[kSphereMaterialIndex];
   if (record.material_index == kSphereMaterialIndex ||
-      scene.materials[kSphereMaterialIndex].type != MaterialType::Emissive ||
+    emissive.emission_strength <= 0.0f ||
       sample_index < 0 ||
       sample_index >= kAreaLightSampleCount) {
     return false;
@@ -122,14 +125,28 @@ __device__ bool try_sample_emissive_sphere(const Scene &scene,
   const float light_cosine =
       fmaxf(0.0f, dot(sample_normals[sample_index], -sample.direction_to_light));
 
-  // Compute the radiance based on the emissive material properties.
-  const Material &emissive = scene.materials[kSphereMaterialIndex];
+  // Compute radiance from the sphere's emission properties.
   sample.radiance = emitted_radiance(emissive) * (light_cosine / distance_squared);
   return light_cosine > 0.0f;
 }
 
+__device__ Vec3 cosine_sample_direction(const Vec3 &normal, float u, float v) {
+  constexpr float pi = 3.14159265358979323846f;
+  const float radius = sqrtf(v);
+  const float phi = 2.0f * pi * u;
+  const Vec3 local{radius * cosf(phi), radius * sinf(phi),
+                   sqrtf(fmaxf(0.0f, 1.0f - v))};
+  const Vec3 reference = fabsf(normal.x) > 0.9f
+    ? Vec3{0.0f, 1.0f, 0.0f}
+    : Vec3{1.0f, 0.0f, 0.0f};
+  const Vec3 tangent = normalized(cross(reference, normal));
+  const Vec3 bitangent = cross(normal, tangent);
+  return normalized(local.x * tangent + local.y * bitangent + local.z * normal);
+}
+
 __device__ Vec3 shade_diffuse(const Scene &scene, const HitRecord &record,
-                              float minimum_distance) {
+                              float minimum_distance, int bounce_count,
+                              int max_bounces, float random_value) {
   const Material &material = scene.materials[record.material_index];
   const Vec3 ambient = material.base_color * scene.environment.color *
                        scene.environment.intensity;
@@ -168,10 +185,23 @@ __device__ Vec3 shade_diffuse(const Scene &scene, const HitRecord &record,
     }
   }
   emissive_direct_light *= 1.0f / kAreaLightSampleCount;
-  return emitted_radiance(material) +
-    ambient +
-    direct_light +
-    emissive_direct_light;
+  Vec3 indirect_light;
+  if (bounce_count < max_bounces) {
+    const unsigned int random_bits = __float_as_uint(random_value);
+    const float secondary_random =
+        static_cast<float>(sample_hash(random_bits +
+                                       static_cast<unsigned int>(bounce_count + 1)) &
+                           0x00ffffffU) / 16777216.0f;
+    const Vec3 scattered_direction = cosine_sample_direction(
+        record.normal, random_value, secondary_random);
+    const Ray scattered{record.position + minimum_distance * record.normal,
+                        scattered_direction};
+    indirect_light = material.base_color *
+                     trace_color(scene, scattered, minimum_distance,
+                                 bounce_count + 1, max_bounces, random_value);
+  }
+  return emitted_radiance(material) + ambient + direct_light +
+         emissive_direct_light + indirect_light;
 }
 
 __device__ Vec3 shade_metal(const Scene &scene,
@@ -288,7 +318,8 @@ __device__ Vec3 shade(const Scene &scene, const Ray &ray,
                          max_bounces, random_value);
 
     case MaterialType::Diffuse:
-      return shade_diffuse(scene, record, minimum_distance);
+      return shade_diffuse(scene, record, minimum_distance, bounce_count,
+                           max_bounces, random_value);
 
     case MaterialType::Dielectric:
       return shade_dielectric(scene, ray, record, minimum_distance,

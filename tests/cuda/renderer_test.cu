@@ -298,5 +298,27 @@ TEST(CudaRenderer, EmissiveSphereCanIlluminateTheFloor) {
   EXPECT_TRUE(has_nonblack_floor_pixel);
 }
 
+TEST(CudaRenderer, SingleSphereGlassWithEmissionRemainsFinite) {
+  if (!has_cuda_device()) {
+    GTEST_SKIP() << "No CUDA-capable device is available";
+  }
+  Scene scene = make_default_scene();
+  Material &sphere = scene.materials[kSphereMaterialIndex];
+  sphere.type = MaterialType::Dielectric;
+  sphere.index_of_refraction = 1.5f;
+  sphere.transmission_color = {0.8f, 0.4f, 0.2f};
+  sphere.absorption_density = 0.5f;
+  sphere.emission_color = {1.0f, 0.1f, 0.02f};
+  sphere.emission_strength = 2.0f;
+  scene.environment.intensity = 0.0f;
+  scene.light.point.radiant_intensity = 0.0f;
+
+  Renderer renderer;
+  const Image image = renderer.render(scene, make_default_camera(1.0f),
+                                      {32, 32, 0.001f, 2, 2, 4});
+
+  EXPECT_TRUE(image_is_finite(image));
+}
+
 } // namespace
 } // namespace raypalette
