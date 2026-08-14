@@ -11,6 +11,29 @@ namespace raypalette::ui {
 namespace {
 
 constexpr const char* kMaterialLabels[] = {"Diffuse", "Metal", "Glass", "Emissive"};
+constexpr const char* kAreaLightSampleLabels[] = {"4 (2x2)", "9 (3x3)", "16 (4x4)"};
+
+int area_light_sample_index(int sample_count) {
+  switch (sample_count) {
+  case 9:
+    return 1;
+  case 16:
+    return 2;
+  default:
+    return 0;
+  }
+}
+
+int area_light_sample_count(int index) {
+  switch (index) {
+  case 1:
+    return 9;
+  case 2:
+    return 16;
+  default:
+    return 4;
+  }
+}
 
 } // namespace
 
@@ -190,8 +213,7 @@ void draw_controls(ControlsContext& context) {
       ImGui::Text("IOR %.3f", sphere_material.index_of_refraction);
     }
     if (sphere_material.type == MaterialType::Emissive &&
-        ImGui::SliderFloat("Emission strength", &sphere_material.emission_strength, 0.0f,
-                           10.0f)) {
+        ImGui::SliderFloat("Emission strength", &sphere_material.emission_strength, 0.0f, 10.0f)) {
       context.request_render();
     }
     if (ImGui::ColorEdit3("Floor color", &context.scene.materials[kFloorMaterialIndex].base_color.x,
@@ -243,7 +265,12 @@ void draw_controls(ControlsContext& context) {
         context.scene.light.area.height = area_size;
         context.request_render();
       }
-      if (ImGui::SliderInt("Area light samples", &context.settings.light_samples_per_frame, 4, 4)) {
+      int area_light_sample_index_value =
+          area_light_sample_index(context.settings.light_samples_per_frame);
+      if (ImGui::Combo("Area light samples", &area_light_sample_index_value, kAreaLightSampleLabels,
+                       IM_ARRAYSIZE(kAreaLightSampleLabels))) {
+        context.settings.light_samples_per_frame =
+            area_light_sample_count(area_light_sample_index_value);
         context.request_render();
       }
     }

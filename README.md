@@ -91,7 +91,7 @@ Get-FileHash .\raypalette.exe -Algorithm SHA256
 
     | 設定 | 説明 |
     |---|---|
-    | `Area light samples` | 面光源をサンプリングする回数です。値を大きくすると影や照明のノイズが減りますが、計算時間が長くなります。 |
+    | `Area light samples` | 面光源をサンプリングする回数です。`4 (2x2)`、`9 (3x3)`、`16 (4x4)`から選択できます。 |
 
 - `Environment color`と`Environment intensity`: シーン全体を包む環境光の設定です。これは光源が直接届かない面への間接的な明るさを示します。
 
