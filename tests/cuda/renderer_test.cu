@@ -32,6 +32,35 @@ bool image_is_finite(const Image &image) {
   return true;
 }
 
+TEST(RendererBackend, StartsOnCpuAndSelectsAvailableCuda) {
+  if (!has_cuda_device()) {
+    GTEST_SKIP() << "No CUDA-capable device is available";
+  }
+
+  Renderer renderer;
+  EXPECT_EQ(renderer.backend_type(), RendererBackendType::Cpu);
+  EXPECT_TRUE(renderer.is_backend_available(RendererBackendType::Cuda));
+  EXPECT_NE(renderer.backend_label(RendererBackendType::Cuda), "GPU (unavailable)");
+  EXPECT_TRUE(renderer.set_backend(RendererBackendType::Cuda));
+  EXPECT_EQ(renderer.backend_type(), RendererBackendType::Cuda);
+}
+
+TEST(RendererBackend, SwitchingBackendResetsAccumulation) {
+  if (!has_cuda_device()) {
+    GTEST_SKIP() << "No CUDA-capable device is available";
+  }
+
+  Renderer renderer;
+  const RenderSettings settings{4, 4, 0.001f, 1, 1, 2};
+  renderer.render(make_default_scene(), make_default_camera(1.0f), settings);
+  ASSERT_EQ(renderer.accumulated_samples(), 1);
+
+  ASSERT_TRUE(renderer.set_backend(RendererBackendType::Cuda));
+  EXPECT_EQ(renderer.accumulated_samples(), 0);
+  EXPECT_TRUE(renderer.set_backend(RendererBackendType::Cpu));
+  EXPECT_EQ(renderer.accumulated_samples(), 0);
+}
+
 TEST(CudaRenderer, RendersFiniteCanonicalImage) {
   if (!has_cuda_device()) {
     GTEST_SKIP() << "No CUDA-capable device is available";

@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <string>
 
 namespace raypalette {
 namespace {
@@ -27,19 +28,32 @@ TEST(CpuRenderer, RendersFiniteCanonicalImage) {
   EXPECT_TRUE(image_is_finite(image));
 }
 
-TEST(RendererBackend, UsesCpuByDefaultAndCanSelectCpu) {
+TEST(RendererBackend, UsesCpuByDefaultAndReportsBackendAvailability) {
   Renderer renderer;
 
   EXPECT_EQ(renderer.backend_type(), RendererBackendType::Cpu);
   EXPECT_EQ(renderer.backend_label(RendererBackendType::Cpu), "CPU");
   EXPECT_TRUE(renderer.is_backend_available(RendererBackendType::Cpu));
   if (renderer.is_backend_available(RendererBackendType::Cuda)) {
-    EXPECT_NE(renderer.backend_label(RendererBackendType::Cuda), "GPU (unavailable)");
+    const std::string label = renderer.backend_label(RendererBackendType::Cuda);
+    EXPECT_EQ(label.rfind("GPU (", 0), 0U);
+    EXPECT_NE(label, "GPU (unavailable)");
   } else {
     EXPECT_EQ(renderer.backend_label(RendererBackendType::Cuda), "GPU (unavailable)");
   }
   EXPECT_TRUE(renderer.set_backend(RendererBackendType::Cpu));
   EXPECT_EQ(renderer.backend_type(), RendererBackendType::Cpu);
+}
+
+TEST(RendererBackend, RejectsUnavailableCudaWithoutChangingBackend) {
+  Renderer renderer;
+  if (renderer.is_backend_available(RendererBackendType::Cuda)) {
+    GTEST_SKIP() << "CUDA is available in this build and environment";
+  }
+
+  EXPECT_FALSE(renderer.set_backend(RendererBackendType::Cuda));
+  EXPECT_EQ(renderer.backend_type(), RendererBackendType::Cpu);
+  EXPECT_EQ(renderer.backend_label(RendererBackendType::Cuda), "GPU (unavailable)");
 }
 
 TEST(CpuRenderer, ReturnsEnvironmentForRayMiss) {
