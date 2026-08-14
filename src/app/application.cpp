@@ -1,5 +1,6 @@
 #include "math/color.hpp"
 #include "render/renderer.hpp"
+#include "ui/hsv_plot.hpp"
 
 #include <GLFW/glfw3.h>
 
@@ -48,12 +49,6 @@ struct HsvPlotPoint {
   raypalette::Vec3 display_color;
   raypalette::Hsv hsv;
   raypalette::Vec3 cylinder_position;
-};
-
-struct HsvPlotView {
-  float yaw = -0.65f;
-  float pitch = 0.35f;
-  float zoom = 1.0f;
 };
 
 struct HsvHueSection {
@@ -207,26 +202,14 @@ std::vector<HsvPlotPoint> make_sphere_hsv_points(const Texture& texture,
   return points;
 }
 
-raypalette::Vec3 rotate_hsv_plot_position(const raypalette::Vec3& position,
-                                          const HsvPlotView& view) {
-  const float yaw_cosine = std::cos(view.yaw);
-  const float yaw_sine = std::sin(view.yaw);
-  const float pitch_cosine = std::cos(view.pitch);
-  const float pitch_sine = std::sin(view.pitch);
-  const float yaw_x = yaw_cosine * position.x - yaw_sine * position.z;
-  const float yaw_z = yaw_sine * position.x + yaw_cosine * position.z;
-  return {yaw_x, pitch_cosine * (position.y - 0.5f) - pitch_sine * yaw_z,
-          pitch_sine * (position.y - 0.5f) + pitch_cosine * yaw_z};
-}
-
 struct HsvScreenPoint {
   ImVec2 position;
   float depth = 0.0f;
 };
 
 HsvScreenPoint project_hsv_position(const raypalette::Vec3& position, const ImVec2& center,
-                                    float scale, const HsvPlotView& view) {
-  const raypalette::Vec3 rotated = rotate_hsv_plot_position(position, view);
+                                    float scale, const raypalette::ui::HsvPlotView& view) {
+  const raypalette::Vec3 rotated = raypalette::ui::rotate_hsv_plot_position(position, view);
   return {{center.x + rotated.x * scale, center.y - rotated.y * scale}, rotated.z};
 }
 
@@ -236,7 +219,7 @@ struct HsvPlotCanvas {
   ImVec2 maximum;
   ImVec2 center;
   float scale;
-  const HsvPlotView& view;
+  const raypalette::ui::HsvPlotView& view;
 
   HsvScreenPoint project(const raypalette::Vec3& position) const {
     return project_hsv_position(position, center, scale, view);
@@ -320,7 +303,7 @@ void draw_hsv_reference_markers(const HsvPlotCanvas& canvas, const raypalette::V
   }
 }
 
-void handle_hsv_view_input(bool hovered, HsvPlotView& view) {
+void handle_hsv_view_input(bool hovered, raypalette::ui::HsvPlotView& view) {
   if (hovered && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
     const ImVec2 drag_delta = ImGui::GetIO().MouseDelta;
     view.yaw += drag_delta.x * 0.01f;
@@ -413,23 +396,20 @@ void draw_hsv_cylinder_guides(const HsvPlotCanvas& canvas, ImU32 guide_color) {
   }
 }
 
-raypalette::Vec3 cylinder_position_at_hue(float hue, float saturation, float value) {
-  constexpr float kTwoPi = 6.28318530717958647692f;
-  const float angle = kTwoPi * hue;
-  return {saturation * std::cos(angle), value, saturation * std::sin(angle)};
-}
-
 void draw_hsv_section_boundary(const HsvPlotCanvas& canvas, float hue, ImU32 outline_color) {
-  const HsvScreenPoint lower = canvas.project(cylinder_position_at_hue(hue, 1.0f, 0.0f));
-  const HsvScreenPoint upper = canvas.project(cylinder_position_at_hue(hue, 1.0f, 1.0f));
+  const HsvScreenPoint lower =
+      canvas.project(raypalette::ui::cylinder_position_at_hue(hue, 1.0f, 0.0f));
+  const HsvScreenPoint upper =
+      canvas.project(raypalette::ui::cylinder_position_at_hue(hue, 1.0f, 1.0f));
   canvas.draw_list->AddLine(lower.position, upper.position, outline_color, 1.0f);
 }
 
 void draw_hsv_section_plane(const HsvPlotCanvas& canvas, const HsvHueSection& section) {
   const HsvScreenPoint bottom_center = canvas.project({0.0f, 0.0f, 0.0f});
   const HsvScreenPoint bottom_edge =
-      canvas.project(cylinder_position_at_hue(section.hue, 1.0f, 0.0f));
-  const HsvScreenPoint top_edge = canvas.project(cylinder_position_at_hue(section.hue, 1.0f, 1.0f));
+      canvas.project(raypalette::ui::cylinder_position_at_hue(section.hue, 1.0f, 0.0f));
+  const HsvScreenPoint top_edge =
+      canvas.project(raypalette::ui::cylinder_position_at_hue(section.hue, 1.0f, 1.0f));
   const HsvScreenPoint top_center = canvas.project({0.0f, 1.0f, 0.0f});
   const ImU32 section_color =
       hsv_plot_color(raypalette::hsv_to_srgb({section.hue, 1.0f, 1.0f}), 0.22f);
@@ -449,7 +429,7 @@ void draw_hsv_space(const std::vector<HsvPlotPoint>& points, const raypalette::V
                     const raypalette::Vec3& light_color_value, float light_energy_value,
                     float light_energy_maximum, HsvHueSection& section,
                     const std::vector<PaletteColor>& palette, int selected_palette_index,
-                    HsvPlotView& view) {
+                    raypalette::ui::HsvPlotView& view) {
   if (ImGui::Button("Reset HSV view")) {
     view = {};
   }
@@ -485,11 +465,6 @@ void draw_hsv_space(const std::vector<HsvPlotPoint>& points, const raypalette::V
                      "HSV cylinder: H angle, S radius, V height");
   draw_list->AddText(ImVec2(canvas_min.x + 8.0f, canvas_max.y - 22.0f), guide_color,
                      "Base color circle: V = 1");
-}
-
-float hue_distance(float first, float second) {
-  const float direct_distance = std::fabs(first - second);
-  return std::min(direct_distance, 1.0f - direct_distance);
 }
 
 void draw_hsv_hue_section(const std::vector<HsvPlotPoint>& points, HsvHueSection& section,
@@ -544,7 +519,7 @@ void draw_hsv_hue_section(const std::vector<HsvPlotPoint>& points, HsvHueSection
   }
   draw_list->AddRect(plane_min, plane_max, ImGui::GetColorU32(ImGuiCol_Border));
   for (const HsvPlotPoint& point : points) {
-    if (hue_distance(point.hsv.hue, section.hue) > section.half_width) {
+    if (raypalette::ui::hue_distance(point.hsv.hue, section.hue) > section.half_width) {
       continue;
     }
     const ImVec2 position(plane_min.x + point.hsv.saturation * section_width,
@@ -555,7 +530,7 @@ void draw_hsv_hue_section(const std::vector<HsvPlotPoint>& points, HsvHueSection
   const auto draw_section_marker = [&](const char* label, const raypalette::Vec3& color,
                                        bool diamond, float radius) {
     const raypalette::Hsv hsv = raypalette::srgb_to_hsv(color);
-    if (hue_distance(hsv.hue, section.hue) > section.half_width) {
+    if (raypalette::ui::hue_distance(hsv.hue, section.hue) > section.half_width) {
       return;
     }
     const ImVec2 position(plane_min.x + hsv.saturation * section_width,
@@ -580,7 +555,7 @@ void draw_hsv_hue_section(const std::vector<HsvPlotPoint>& points, HsvHueSection
   draw_section_marker("Light", light_color_value, false, 6.0f);
   for (int index = 0; index < static_cast<int>(palette.size()); ++index) {
     const raypalette::Hsv hsv = raypalette::srgb_to_hsv(palette[index].color);
-    if (hue_distance(hsv.hue, section.hue) > section.half_width) {
+    if (raypalette::ui::hue_distance(hsv.hue, section.hue) > section.half_width) {
       continue;
     }
     const ImVec2 position(plane_min.x + hsv.saturation * section_width,
@@ -684,7 +659,7 @@ int main() {
   raypalette::Image image;
   std::vector<PaletteColor> palette;
   std::vector<HsvPlotPoint> sphere_hsv_points;
-  HsvPlotView hsv_plot_view;
+  raypalette::ui::HsvPlotView hsv_plot_view;
   HsvHueSection hsv_hue_section;
   int selected_palette_index = -1;
   bool needs_render = true;
