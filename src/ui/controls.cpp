@@ -309,13 +309,15 @@ void draw_controls(ControlsContext& context) {
 
   const ImVec2 display_panel_start = begin_settings_panel();
   if (ImGui::CollapsingHeader("Camera / Display", ImGuiTreeNodeFlags_DefaultOpen)) {
-    if (ImGui::SliderFloat("Exposure (EV)", &context.display_settings.exposure_ev, -4.0f, 4.0f)) {
+    if (ImGui::SliderFloat("Exposure (EV)", &context.gui_state.display_settings.exposure_ev, -4.0f,
+                           4.0f)) {
       context.clear_palette();
-      context.needs_display_update = true;
+      context.gui_state.needs_display_update = true;
     }
-    if (ImGui::Checkbox("Reinhard tone mapping", &context.display_settings.use_reinhard)) {
+    if (ImGui::Checkbox("Reinhard tone mapping",
+                        &context.gui_state.display_settings.use_reinhard)) {
       context.clear_palette();
-      context.needs_display_update = true;
+      context.gui_state.needs_display_update = true;
     }
     if (ImGui::SliderFloat("Camera distance", &context.camera_distance, 2.0f, 10.0f)) {
       context.camera = make_default_camera(1.0f, context.camera_distance);

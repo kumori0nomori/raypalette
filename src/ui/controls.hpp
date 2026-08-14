@@ -5,6 +5,7 @@
 #include "render/material.hpp"
 #include "render/renderer.hpp"
 #include "render/scene.hpp"
+#include "ui/gui_state.hpp"
 #include "ui/texture.hpp"
 
 #include <functional>
@@ -19,9 +20,7 @@ struct ControlsContext {
   Camera& camera;
   float& camera_distance;
   Renderer& renderer;
-  DisplaySettings& display_settings;
-  bool& needs_render;
-  bool& needs_display_update;
+  GuiState& gui_state;
   std::function<void()> clear_palette;
   std::function<void()> request_render;
 };

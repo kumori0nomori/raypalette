@@ -1,6 +1,7 @@
 #include "math/color.hpp"
 #include "render/renderer.hpp"
 #include "ui/controls.hpp"
+#include "ui/gui_state.hpp"
 #include "ui/hsv_plot.hpp"
 #include "ui/hsv_plot_gui.hpp"
 #include "ui/palette.hpp"
@@ -70,27 +71,21 @@ int main() {
                                       /*light_samples_per_frame=*/4,
                                       /*target_samples_per_pixel=*/64,
                                       /*max_bounces=*/8};
-  raypalette::ui::DisplaySettings display_settings;
   float camera_distance = 5.0f;
   raypalette::Camera camera = raypalette::make_default_camera(1.0f, camera_distance);
   raypalette::Renderer renderer;
   raypalette::ui::Texture texture;
   raypalette::Image image;
-  std::vector<raypalette::ui::PaletteColor> palette;
   std::vector<raypalette::ui::HsvPlotPoint> sphere_hsv_points;
-  raypalette::ui::HsvPlotView hsv_plot_view;
-  raypalette::ui::HsvHueSection hsv_hue_section;
-  int selected_palette_index = -1;
-  bool needs_render = true;
-  bool needs_display_update = true;
+  raypalette::ui::GuiState gui_state;
   auto clear_palette = [&]() {
-    palette.clear();
-    selected_palette_index = -1;
+    gui_state.palette.clear();
+    gui_state.selected_palette_index = -1;
   };
   auto request_render = [&]() {
     renderer.reset_accumulation();
     clear_palette();
-    needs_render = true;
+    gui_state.needs_render = true;
   };
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
@@ -99,29 +94,24 @@ int main() {
     ImGui::NewFrame();
 
     raypalette::ui::ControlsContext controls_context{
-        scene,        light_polar,          light_type_index, settings,
-        camera,       camera_distance,      renderer,         display_settings,
-        needs_render, needs_display_update, clear_palette,    request_render};
+        scene,           light_polar, light_type_index, settings,      camera,
+        camera_distance, renderer,    gui_state,        clear_palette, request_render};
     raypalette::ui::draw_controls(controls_context);
 
-    if (needs_render) {
+    if (gui_state.needs_render) {
       image = renderer.render(scene, camera, settings);
-      texture.upload(image, display_settings);
+      texture.upload(image, gui_state.display_settings);
       sphere_hsv_points = raypalette::ui::make_sphere_hsv_points(texture, scene, camera, settings);
-      needs_render = !renderer.is_accumulation_complete(settings);
-      needs_display_update = false;
-    } else if (needs_display_update) {
-      texture.upload(image, display_settings);
+      gui_state.needs_render = !renderer.is_accumulation_complete(settings);
+      gui_state.needs_display_update = false;
+    } else if (gui_state.needs_display_update) {
+      texture.upload(image, gui_state.display_settings);
       sphere_hsv_points = raypalette::ui::make_sphere_hsv_points(texture, scene, camera, settings);
-      needs_display_update = false;
+      gui_state.needs_display_update = false;
     }
 
     raypalette::ui::PreviewContext preview_context{
-        image,
-        texture,
-        palette,
-        selected_palette_index,
-        {layout.preview_panel.width, layout.preview_panel.height}};
+        image, texture, gui_state, {layout.preview_panel.width, layout.preview_panel.height}};
     raypalette::ui::draw_preview(preview_context);
 
     ImGui::SetNextWindowSize(ImVec2(layout.hsv_space_panel.width, layout.hsv_space_panel.height),
@@ -129,18 +119,20 @@ int main() {
     ImGui::Begin("HSV Space");
     const raypalette::Material& sphere_material = scene.materials[raypalette::kSphereMaterialIndex];
     const raypalette::Vec3 display_sphere_color = raypalette::prepare_for_display(
-        raypalette::ui::sphere_material_color(sphere_material), display_settings.exposure_ev,
-        display_settings.use_reinhard);
+        raypalette::ui::sphere_material_color(sphere_material),
+        gui_state.display_settings.exposure_ev, gui_state.display_settings.use_reinhard);
     const raypalette::Vec3 display_light_color = raypalette::prepare_for_display(
-        raypalette::ui::light_color(scene.light), display_settings.exposure_ev,
-        display_settings.use_reinhard);
+        raypalette::ui::light_color(scene.light), gui_state.display_settings.exposure_ev,
+        gui_state.display_settings.use_reinhard);
     const raypalette::ui::LightEnergyUi energy_ui =
         raypalette::ui::light_energy_ui(scene.light.type);
     raypalette::ui::draw_hsv_space(sphere_hsv_points, display_sphere_color, display_light_color,
                                    raypalette::ui::light_energy(scene.light), energy_ui.maximum,
-                                   hsv_hue_section, palette, selected_palette_index, hsv_plot_view);
-    raypalette::ui::draw_hsv_hue_section(sphere_hsv_points, hsv_hue_section, display_sphere_color,
-                                         display_light_color, palette, selected_palette_index);
+                                   gui_state.hsv_hue_section, gui_state.palette,
+                                   gui_state.selected_palette_index, gui_state.hsv_plot_view);
+    raypalette::ui::draw_hsv_hue_section(sphere_hsv_points, gui_state.hsv_hue_section,
+                                         display_sphere_color, display_light_color,
+                                         gui_state.palette, gui_state.selected_palette_index);
     ImGui::End();
 
     ImGui::Render();

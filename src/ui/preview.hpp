@@ -1,6 +1,7 @@
 #pragma once
 
 #include "render/image.hpp"
+#include "ui/gui_state.hpp"
 #include "ui/palette.hpp"
 #include "ui/texture.hpp"
 
@@ -16,8 +17,7 @@ struct PreviewLayout {
 struct PreviewContext {
   const Image& image;
   const Texture& texture;
-  std::vector<PaletteColor>& palette;
-  int& selected_palette_index;
+  GuiState& gui_state;
   PreviewLayout layout;
 };
 

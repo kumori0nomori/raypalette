@@ -63,6 +63,7 @@ set(RAYPALETTE_FORMAT_FILES
     ${PROJECT_SOURCE_DIR}/src/ui/hsv_plot_gui.hpp
     ${PROJECT_SOURCE_DIR}/src/ui/controls.cpp
     ${PROJECT_SOURCE_DIR}/src/ui/controls.hpp
+    ${PROJECT_SOURCE_DIR}/src/ui/gui_state.hpp
     ${PROJECT_SOURCE_DIR}/src/ui/palette.cpp
     ${PROJECT_SOURCE_DIR}/src/ui/palette.hpp
     ${PROJECT_SOURCE_DIR}/src/ui/preview.cpp
