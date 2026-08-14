@@ -179,7 +179,7 @@ if(RAYPALETTE_BUILD_GUI)
     target_link_libraries(raypalette_imgui PUBLIC glfw)
 
     find_package(OpenGL REQUIRED)
-    add_executable(raypalette_gui
+    add_executable(raypalette
         src/app/application.cpp
         src/ui/hsv_plot.cpp
         src/ui/hsv_plot_gui.cpp
@@ -188,8 +188,8 @@ if(RAYPALETTE_BUILD_GUI)
         src/ui/preview.cpp
         src/ui/texture.cpp
     )
-    target_include_directories(raypalette_gui PRIVATE ${PROJECT_SOURCE_DIR}/src)
-    target_link_libraries(raypalette_gui PRIVATE
+    target_include_directories(raypalette PRIVATE ${PROJECT_SOURCE_DIR}/src)
+    target_link_libraries(raypalette PRIVATE
         raypalette_renderer
         raypalette_imgui
         OpenGL::GL

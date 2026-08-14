@@ -51,13 +51,13 @@ sudo apt install clang-format
 cmake --preset linux-debug
 cmake --build --preset linux-debug
 ctest --preset linux-debug --output-on-failure
-./build/linux-debug/raypalette_gui
+./build/linux-debug/raypalette
 
 # CPU
 cmake --preset linux-cpu-debug
 cmake --build --preset linux-cpu-debug
 ctest --preset linux-cpu-debug --output-on-failure
-./build/linux-cpu-debug/raypalette_gui
+./build/linux-cpu-debug/raypalette
 ```
 
 ### 2.2. Windows 11
@@ -75,13 +75,22 @@ CPU + GUI構成をビルドします。
 cmake --preset windows-cpu-debug
 cmake --build --preset windows-cpu-debug
 ctest --preset windows-cpu-debug --output-on-failure
-.\build\windows-cpu-debug\Debug\raypalette_gui.exe
+.\build\windows-cpu-debug\Debug\raypalette.exe
 
 # GPU
 cmake --preset windows-debug
 cmake --build --preset windows-debug
 ctest --preset windows-debug --output-on-failure
-.\build\windows-debug\Debug\raypalette_gui.exe
+.\build\windows-debug\Debug\raypalette.exe
+```
+
+CPU版のRelease配布exeを作成する場合は、Git Bashから次を実行します。ビルドとCTestが
+成功した後、`dist/windows-cpu-release/raypalette.exe`へコピーされます。
+配布ビルドはMSVCランタイムを静的リンクするため、Visual C++ Redistributableの別途
+インストールは不要です。Windows標準のOpenGL・Win32 DLLは使用します。
+
+```sh
+bash package_windows_cpu.sh
 ```
 
 整形チェックを行う場合、Visual Studio InstallerでLLVM toolsを追加するか、LLVM公式
