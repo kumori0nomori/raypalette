@@ -147,7 +147,7 @@ void draw_controls(ControlsContext& context) {
       context.request_render();
     }
     if (sphere_material.type == MaterialType::Dielectric) {
-      if (ImGui::ColorEdit3("Glass transmission", &sphere_material.transmission_color.x,
+      if (ImGui::ColorEdit3("Glass tint", &sphere_material.transmission_color.x,
                             ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs)) {
         sphere_material.transmission_color.x = std::max(0.0f, sphere_material.transmission_color.x);
         sphere_material.transmission_color.y = std::max(0.0f, sphere_material.transmission_color.y);
@@ -190,7 +190,7 @@ void draw_controls(ControlsContext& context) {
       ImGui::Text("IOR %.3f", sphere_material.index_of_refraction);
     }
     if (sphere_material.type == MaterialType::Emissive &&
-        ImGui::SliderFloat("Sphere emission strength", &sphere_material.emission_strength, 0.0f,
+        ImGui::SliderFloat("Emission strength", &sphere_material.emission_strength, 0.0f,
                            10.0f)) {
       context.request_render();
     }
