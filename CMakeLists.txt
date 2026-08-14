@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(RayPalette
+project(raypalette
     VERSION 0.1.0
     DESCRIPTION "A lightweight CUDA renderer for illustration color studies"
     LANGUAGES CXX
@@ -32,12 +32,12 @@ if(RAYPALETTE_ENABLE_CUDA)
 
     if(CMAKE_CUDA_COMPILER_VERSION VERSION_LESS 12.8)
         message(FATAL_ERROR
-            "RayPalette requires CUDA Toolkit 12.8 or newer for RTX 50 series (sm_120). "
+            "raypalette requires CUDA Toolkit 12.8 or newer for RTX 50 series (sm_120). "
             "Detected CUDA ${CMAKE_CUDA_COMPILER_VERSION}.")
     endif()
 
     set(CMAKE_CUDA_ARCHITECTURES 120-real CACHE STRING
-        "RayPalette supports RTX 50 series GPUs (sm_120) only." FORCE)
+        "raypalette supports RTX 50 series GPUs (sm_120) only." FORCE)
 endif()
 
 option(RAYPALETTE_BUILD_GUI "Build the native GUI application" OFF)
@@ -179,7 +179,7 @@ if(RAYPALETTE_BUILD_GUI)
     target_link_libraries(raypalette_imgui PUBLIC glfw)
 
     find_package(OpenGL REQUIRED)
-    add_executable(raypalette_gui
+    add_executable(raypalette
         src/app/application.cpp
         src/ui/hsv_plot.cpp
         src/ui/hsv_plot_gui.cpp
@@ -188,8 +188,8 @@ if(RAYPALETTE_BUILD_GUI)
         src/ui/preview.cpp
         src/ui/texture.cpp
     )
-    target_include_directories(raypalette_gui PRIVATE ${PROJECT_SOURCE_DIR}/src)
-    target_link_libraries(raypalette_gui PRIVATE
+    target_include_directories(raypalette PRIVATE ${PROJECT_SOURCE_DIR}/src)
+    target_link_libraries(raypalette PRIVATE
         raypalette_renderer
         raypalette_imgui
         OpenGL::GL
@@ -197,7 +197,7 @@ if(RAYPALETTE_BUILD_GUI)
 endif()
 
 if(RAYPALETTE_ENABLE_CUDA)
-    message(STATUS "RayPalette CUDA target architecture: sm_${CMAKE_CUDA_ARCHITECTURES}")
+    message(STATUS "raypalette CUDA target architecture: sm_${CMAKE_CUDA_ARCHITECTURES}")
 else()
-    message(STATUS "RayPalette renderer backend: CPU")
+    message(STATUS "raypalette renderer backend: CPU")
 endif()

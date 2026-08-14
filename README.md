@@ -1,6 +1,6 @@
-# RayPalette
+# raypalette
 
-RayPalette は、制御した照明下でイラストの色がどのように変化するかを
+raypalette は、制御した照明下でイラストの色がどのように変化するかを
 検討するための軽量な CUDA レンダラーです。
 シンプルな球と床のシーンの材質設定をGUIで対話的に調整できます。
 
@@ -51,13 +51,13 @@ sudo apt install clang-format
 cmake --preset linux-debug
 cmake --build --preset linux-debug
 ctest --preset linux-debug --output-on-failure
-./build/linux-debug/raypalette_gui
+./build/linux-debug/raypalette
 
 # CPU
 cmake --preset linux-cpu-debug
 cmake --build --preset linux-cpu-debug
 ctest --preset linux-cpu-debug --output-on-failure
-./build/linux-cpu-debug/raypalette_gui
+./build/linux-cpu-debug/raypalette
 ```
 
 ### 2.2. Windows 11
@@ -75,13 +75,31 @@ CPU + GUI構成をビルドします。
 cmake --preset windows-cpu-debug
 cmake --build --preset windows-cpu-debug
 ctest --preset windows-cpu-debug --output-on-failure
-.\build\windows-cpu-debug\Debug\raypalette_gui.exe
+.\build\windows-cpu-debug\Debug\raypalette.exe
 
 # GPU
 cmake --preset windows-debug
 cmake --build --preset windows-debug
 ctest --preset windows-debug --output-on-failure
-.\build\windows-debug\Debug\raypalette_gui.exe
+.\build\windows-debug\Debug\raypalette.exe
+```
+
+CPU版のRelease配布exeを作成する場合は、Git Bashから次を実行します。ビルドとCTestが
+成功した後、`dist/windows-cpu-release/raypalette.exe`へコピーされます。
+配布ビルドはMSVCランタイムを静的リンクするため、Visual C++ Redistributableの別途
+インストールは不要です。Windows標準のOpenGL・Win32 DLLは使用します。
+
+```sh
+bash scripts/package_windows_cpu.sh
+```
+
+GPU版のRelease配布exeは、CUDA Toolkitと対応GPUがある環境で次を実行します。ビルドと
+CTestが成功した後、`dist/windows-gpu-release/raypalette.exe`へコピーされます。MSVC
+ランタイムとCUDA runtimeは静的リンクされるため、別途DLLを同梱する必要はありません。
+利用者側にはRTX 50シリーズ対応のNVIDIAドライバが必要です。
+
+```sh
+bash scripts/package_windows_gpu.sh
 ```
 
 整形チェックを行う場合、Visual Studio InstallerでLLVM toolsを追加するか、LLVM公式
@@ -150,7 +168,7 @@ Dear ImGui、GLFW、GoogleTest は、CMake の `FetchContent` を通じて
 
 ## 6. 実行結果
 
-左の`RayPalette Controls`画面でシーンの設定を行うと、その結果は逐次右の`Preview`画面へと反映されます。
+左の`raypalette Controls`画面でシーンの設定を行うと、その結果は逐次右の`Preview`画面へと反映されます。
 また`Preview`画面でマウスをクリックするとその下側の`Palette`タブにそのuv位置の色を追加します。
 `Palette`に追加された各色のHEXコードを選択して`Ctrl+C`を行うことで貼り付けすることが可能です。
 この`Palette`上の色はシーンの設定を変えるたびにリセットされます。
