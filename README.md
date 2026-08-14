@@ -20,7 +20,6 @@ raypalette は、制御した照明下で球の色が、どのように変化す
 GitHubの[Releases](../../releases)から`raypalette.exe`をダウンロードしてください。
 
 ライセンス確認用に、`THIRD_PARTY_NOTICES.txt`も同じRelease Assetとして公開しています。
-ダウンロードしたexeと同じ場所に保存してください。
 
 ### 1.3 起動
 
