@@ -16,18 +16,17 @@ struct RenderSettings {
   int samples_per_pixel = 1;
   // number of shadow rays per intersection
   int light_samples_per_frame = 4;
-  // number of accumulated path samples per pixel 
+  // number of accumulated path samples per pixel
   int target_samples_per_pixel = 1;
   int max_bounces = 1;
 };
 
 class Renderer {
 public:
-  Image render(const Scene &scene, const Camera &camera,
-               const RenderSettings &settings);
+  Image render(const Scene& scene, const Camera& camera, const RenderSettings& settings);
   void reset_accumulation();
   int accumulated_samples() const;
-  bool is_accumulation_complete(const RenderSettings &settings) const;
+  bool is_accumulation_complete(const RenderSettings& settings) const;
 
 private:
   std::vector<Vec3> accumulated_pixels_;

@@ -11,8 +11,7 @@ struct Camera {
   Vec3 vertical{0.0f, 1.0f, 0.0f};
 };
 
-inline Camera make_default_camera(float aspect_ratio,
-                                  float camera_distance = 5.0f) {
+inline Camera make_default_camera(float aspect_ratio, float camera_distance = 5.0f) {
   const Vec3 origin{0.0f, 1.5f, camera_distance};
   const Vec3 look_at{0.0f, 1.0f, 0.0f};
   const Vec3 up{0.0f, 1.0f, 0.0f};
@@ -28,9 +27,7 @@ inline Camera make_default_camera(float aspect_ratio,
   return {origin, lower_left_corner, horizontal, vertical};
 }
 
-RAYPALETTE_HOST_DEVICE inline Ray camera_ray(const Camera &camera,
-                                             float u,
-                                             float v) {
+RAYPALETTE_HOST_DEVICE inline Ray camera_ray(const Camera& camera, float u, float v) {
   return {camera.origin,
           camera.lower_left_corner + u * camera.horizontal + v * camera.vertical - camera.origin};
 }

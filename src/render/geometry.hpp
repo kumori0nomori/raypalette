@@ -13,8 +13,7 @@ struct HitRecord {
   std::uint32_t material_index = 0;
   bool front_face = true;
 
-  RAYPALETTE_HOST_DEVICE void set_face_normal(const Ray &ray,
-                                              const Vec3 &outward_normal) {
+  RAYPALETTE_HOST_DEVICE void set_face_normal(const Ray& ray, const Vec3& outward_normal) {
     front_face = dot(ray.direction, outward_normal) < 0.0f;
     normal = front_face ? outward_normal : -outward_normal;
   }
@@ -32,10 +31,9 @@ struct Plane {
   std::uint32_t material_index = 0;
 };
 
-RAYPALETTE_HOST_DEVICE inline bool hit_sphere(const Sphere &sphere,
-                                              const Ray &ray, float minimum_distance,
-                                              float maximum_distance,
-                                              HitRecord &record) {
+RAYPALETTE_HOST_DEVICE inline bool hit_sphere(const Sphere& sphere, const Ray& ray,
+                                              float minimum_distance, float maximum_distance,
+                                              HitRecord& record) {
   if (sphere.radius <= 0.0f) {
     return false;
   }
@@ -69,10 +67,9 @@ RAYPALETTE_HOST_DEVICE inline bool hit_sphere(const Sphere &sphere,
   return true;
 }
 
-RAYPALETTE_HOST_DEVICE inline bool hit_plane(const Plane &plane, const Ray &ray,
-                                             float minimum_distance,
-                                             float maximum_distance,
-                                             HitRecord &record) {
+RAYPALETTE_HOST_DEVICE inline bool hit_plane(const Plane& plane, const Ray& ray,
+                                             float minimum_distance, float maximum_distance,
+                                             HitRecord& record) {
   constexpr float parallel_threshold = 1.0e-6f;
   const Vec3 plane_normal = normalized(plane.normal);
   if (length_squared(plane_normal) == 0.0f) {

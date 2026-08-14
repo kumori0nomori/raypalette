@@ -1,3 +1,5 @@
+#include "render/bsdf.hpp"
+#include "render/light_sampling.hpp"
 #include "render/scene.hpp"
 
 #include <gtest/gtest.h>
@@ -45,13 +47,11 @@ TEST(Material, EvaluatesFiniteGgxTerms) {
 
 TEST(Material, ComputesRefractionAndFresnel) {
   Vec3 refracted;
-  EXPECT_TRUE(refract_direction({0.0f, -1.0f, 0.0f}, {0.0f, 1.0f, 0.0f},
-                                1.0f / 1.5f, refracted));
+  EXPECT_TRUE(refract_direction({0.0f, -1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, 1.0f / 1.5f, refracted));
   EXPECT_NEAR(refracted.y, -1.0f, 1.0e-6f);
   EXPECT_NEAR(schlick_reflectance(1.0f, 1.0f / 1.5f), 0.04f, 1.0e-6f);
   EXPECT_NEAR(schlick_reflectance(1.0f, 1.5f), 0.04f, 1.0e-6f);
-  EXPECT_FALSE(refract_direction({0.8660254f, 0.0f, 0.5f},
-                                 {0.0f, 0.0f, -1.0f}, 1.5f, refracted));
+  EXPECT_FALSE(refract_direction({0.8660254f, 0.0f, 0.5f}, {0.0f, 0.0f, -1.0f}, 1.5f, refracted));
 }
 
 TEST(Material, AppliesBeerLambertAbsorption) {
@@ -67,8 +67,7 @@ TEST(Material, AppliesBeerLambertAbsorption) {
 }
 
 TEST(Material, ColoredGlassAttenuatesChannelsIndependently) {
-  const Vec3 attenuation =
-      beer_lambert_attenuation({0.8f, 0.4f, 0.2f}, 1.0f, 2.0f);
+  const Vec3 attenuation = beer_lambert_attenuation({0.8f, 0.4f, 0.2f}, 1.0f, 2.0f);
 
   EXPECT_NEAR(attenuation.x, 0.64f, 1.0e-5f);
   EXPECT_NEAR(attenuation.y, 0.16f, 1.0e-5f);
@@ -86,8 +85,8 @@ TEST(Material, RoughnessChangesGgxDistribution) {
 
 TEST(Light, ConvertsPointLightPolarPositionAroundSphereCenter) {
   const Vec3 sphere_center{0.0f, 1.0f, 0.0f};
-  const Light light = make_point_light({2.0f, 0.0f, 0.0f}, sphere_center,
-                                       {1.0f, 0.5f, 0.25f}, 50.0f);
+  const Light light =
+      make_point_light({2.0f, 0.0f, 0.0f}, sphere_center, {1.0f, 0.5f, 0.25f}, 50.0f);
 
   EXPECT_EQ(light.type, LightType::Point);
   EXPECT_NEAR(light.point.position.x, 0.0f, 1.0e-6f);
@@ -139,8 +138,7 @@ TEST(Light, RejectsSurfaceAtPointLightPosition) {
 }
 
 TEST(Light, CreatesDirectionalLightFromPolarDirection) {
-  const Light light = make_directional_light(90.0f, 0.0f, {1.0f, 0.5f, 0.25f},
-                                             3.0f);
+  const Light light = make_directional_light(90.0f, 0.0f, {1.0f, 0.5f, 0.25f}, 3.0f);
   LightSample sample;
 
   ASSERT_TRUE(sample_light(light, {12.0f, -3.0f, 8.0f}, sample));
@@ -153,24 +151,21 @@ TEST(Light, CreatesDirectionalLightFromPolarDirection) {
 }
 
 TEST(Light, ValidatesRectAreaParametersWithoutSampling) {
-  const Light light = make_rect_area_light({3.0f, 45.0f, 0.0f}, {0.0f, 1.0f, 0.0f},
-                                           {0.0f, -1.0f, 0.0f}, 2.0f, 1.0f,
-                                           {1.0f, 1.0f, 1.0f}, 5.0f);
+  const Light light =
+      make_rect_area_light({3.0f, 45.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, -1.0f, 0.0f}, 2.0f, 1.0f,
+                           {1.0f, 1.0f, 1.0f}, 5.0f);
   LightSample sample;
 
   EXPECT_EQ(light.type, LightType::RectArea);
   EXPECT_TRUE(is_valid_light(light));
   EXPECT_FALSE(sample_light(light, {}, sample));
-  ASSERT_TRUE(sample_area_light(light, {0.0f, -1.0f, 0.0f}, 0.0f, 0.0f,
-                                sample));
+  ASSERT_TRUE(sample_area_light(light, {0.0f, -1.0f, 0.0f}, 0.0f, 0.0f, sample));
   EXPECT_NEAR(sample.direction_to_light.y, 0.8891311f, 1.0e-6f);
   EXPECT_GT(sample.radiance.x, 0.0f);
   EXPECT_GT(sample.pdf, 0.0f);
 
-  EXPECT_FALSE(sample_area_light(light, {0.0f, 10.0f, 0.0f}, 0.0f, 0.0f,
-                                 sample));
-  EXPECT_FALSE(sample_area_light(light, {0.0f, -1.0f, 0.0f}, 0.6f, 0.0f,
-                                 sample));
+  EXPECT_FALSE(sample_area_light(light, {0.0f, 10.0f, 0.0f}, 0.0f, 0.0f, sample));
+  EXPECT_FALSE(sample_area_light(light, {0.0f, -1.0f, 0.0f}, 0.6f, 0.0f, sample));
 
   Light invalid_light = light;
   invalid_light.area.width = 0.0f;
