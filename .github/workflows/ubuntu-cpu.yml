@@ -7,6 +7,9 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        configuration: [debug, release]
 
     steps:
       - name: Check out repository
@@ -28,13 +31,13 @@ jobs:
             libxi-dev
 
       - name: Configure CPU GUI build
-        run: cmake --preset linux-cpu-debug
+        run: cmake --preset linux-cpu-${{ matrix.configuration }}
 
       - name: Check formatting
-        run: cmake --build --preset linux-cpu-debug --target format-check
+        run: cmake --build --preset linux-cpu-${{ matrix.configuration }} --target format-check
 
       - name: Build
-        run: cmake --build --preset linux-cpu-debug --parallel
+        run: cmake --build --preset linux-cpu-${{ matrix.configuration }} --parallel
 
       - name: Run tests
-        run: ctest --preset linux-cpu-debug --output-on-failure
+        run: ctest --preset linux-cpu-${{ matrix.configuration }} --output-on-failure
