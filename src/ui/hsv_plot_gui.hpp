@@ -38,5 +38,12 @@ void draw_hsv_reference_markers(const HsvPlotCanvas& canvas, const Vec3& sphere_
                                 float light_energy_maximum,
                                 const std::vector<PaletteColor>& palette,
                                 int selected_palette_index);
+void draw_hsv_base_color_wheel(const HsvPlotCanvas& canvas);
+void draw_hsv_cylinder_guides(const HsvPlotCanvas& canvas, ImU32 guide_color);
+void draw_hsv_section_plane(const HsvPlotCanvas& canvas, const HsvHueSection& section);
+void draw_hsv_space(const std::vector<HsvPlotPoint>& points, const Vec3& sphere_color,
+                    const Vec3& light_color, float light_energy, float light_energy_maximum,
+                    HsvHueSection& section, const std::vector<PaletteColor>& palette,
+                    int selected_palette_index, HsvPlotView& view);
 
 } // namespace raypalette::ui
