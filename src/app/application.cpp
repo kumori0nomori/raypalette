@@ -74,6 +74,9 @@ int main() {
   float camera_distance = 5.0f;
   raypalette::Camera camera = raypalette::make_default_camera(1.0f, camera_distance);
   raypalette::Renderer renderer;
+  if (renderer.is_backend_available(raypalette::RendererBackendType::Cuda)) {
+    renderer.set_backend(raypalette::RendererBackendType::Cuda);
+  }
   raypalette::ui::Texture texture;
   raypalette::Image image;
   std::vector<raypalette::ui::HsvPlotPoint> sphere_hsv_points;

@@ -32,11 +32,41 @@ bool image_is_finite(const Image &image) {
   return true;
 }
 
+TEST(RendererBackend, StartsOnCpuAndSelectsAvailableCuda) {
+  if (!has_cuda_device()) {
+    GTEST_SKIP() << "No CUDA-capable device is available";
+  }
+
+  Renderer renderer;
+  EXPECT_EQ(renderer.backend_type(), RendererBackendType::Cpu);
+  EXPECT_TRUE(renderer.is_backend_available(RendererBackendType::Cuda));
+  EXPECT_NE(renderer.backend_label(RendererBackendType::Cuda), "GPU (unavailable)");
+  EXPECT_TRUE(renderer.set_backend(RendererBackendType::Cuda));
+  EXPECT_EQ(renderer.backend_type(), RendererBackendType::Cuda);
+}
+
+TEST(RendererBackend, SwitchingBackendResetsAccumulation) {
+  if (!has_cuda_device()) {
+    GTEST_SKIP() << "No CUDA-capable device is available";
+  }
+
+  Renderer renderer;
+  const RenderSettings settings{4, 4, 0.001f, 1, 1, 2};
+  renderer.render(make_default_scene(), make_default_camera(1.0f), settings);
+  ASSERT_EQ(renderer.accumulated_samples(), 1);
+
+  ASSERT_TRUE(renderer.set_backend(RendererBackendType::Cuda));
+  EXPECT_EQ(renderer.accumulated_samples(), 0);
+  EXPECT_TRUE(renderer.set_backend(RendererBackendType::Cpu));
+  EXPECT_EQ(renderer.accumulated_samples(), 0);
+}
+
 TEST(CudaRenderer, RendersFiniteCanonicalImage) {
   if (!has_cuda_device()) {
     GTEST_SKIP() << "No CUDA-capable device is available";
   }
   Renderer renderer;
+  ASSERT_TRUE(renderer.set_backend(RendererBackendType::Cuda));
   const Image image = renderer.render(make_default_scene(),
                                       make_default_camera(1.0f),
                                       {32, 32, 0.001f});
@@ -63,6 +93,7 @@ TEST(CudaRenderer, ReturnsEnvironmentForRayMiss) {
                            {0.0f, 0.0f, 0.0f},
                            {0.0f, 0.0f, 0.0f}};
   Renderer renderer;
+  ASSERT_TRUE(renderer.set_backend(RendererBackendType::Cuda));
   const Image image = renderer.render(scene, miss_camera, {1, 1, 0.001f});
 
   EXPECT_NEAR(image.pixels.front().x, 0.25f, 1.0e-6f);
@@ -75,6 +106,7 @@ TEST(CudaRenderer, SupportsDeterministicSupersampling) {
     GTEST_SKIP() << "No CUDA-capable device is available";
   }
   Renderer renderer;
+  ASSERT_TRUE(renderer.set_backend(RendererBackendType::Cuda));
   RenderSettings settings{32, 32, 0.001f, 4, 4, 1};
   const Image image = renderer.render(make_default_scene(),
                                       make_default_camera(1.0f), settings);
@@ -92,6 +124,7 @@ TEST(CudaRenderer, AccumulatesProgressiveFrames) {
     GTEST_SKIP() << "No CUDA-capable device is available";
   }
   Renderer renderer;
+  ASSERT_TRUE(renderer.set_backend(RendererBackendType::Cuda));
   RenderSettings settings{8, 8, 0.001f, 2, 4, 4};
   const Scene scene = make_default_scene();
   const Camera camera = make_default_camera(1.0f);
@@ -118,6 +151,7 @@ TEST(CudaRenderer, RendersEmissionWithoutDirectLight) {
   scene.light.point.radiant_intensity = 0.0f;
 
   Renderer renderer;
+  ASSERT_TRUE(renderer.set_backend(RendererBackendType::Cuda));
   const Image image = renderer.render(scene, make_default_camera(1.0f),
                                       {32, 32, 0.001f, 1, 1});
   const Vec3 &center_pixel = image.pixels[16 * image.width + 16];
@@ -141,6 +175,7 @@ TEST(CudaRenderer, ReflectsEnvironmentThroughMetalSphere) {
   scene.environment.intensity = 1.0f;
 
   Renderer renderer;
+  ASSERT_TRUE(renderer.set_backend(RendererBackendType::Cuda));
   const Image image = renderer.render(scene, make_default_camera(1.0f),
                                       {32, 32, 0.001f, 1, 1, 1});
   const Vec3 &center_pixel = image.pixels[16 * image.width + 16];
@@ -163,6 +198,7 @@ TEST(CudaRenderer, RendersGlassMaterial) {
   scene.light.point.radiant_intensity = 0.0f;
 
   Renderer renderer;
+  ASSERT_TRUE(renderer.set_backend(RendererBackendType::Cuda));
   const Image image = renderer.render(scene, make_default_camera(1.0f),
                                       {16, 16, 0.001f, 1, 4, 1, 3});
   for (const Vec3 &pixel : image.pixels) {
@@ -185,6 +221,7 @@ TEST(CudaRenderer, RendersColoredGlassWithFinitePixels) {
   sphere_material.absorption_density = 1.5f;
 
   Renderer renderer;
+  ASSERT_TRUE(renderer.set_backend(RendererBackendType::Cuda));
   const Image image = renderer.render(scene, make_default_camera(1.0f),
                                       {32, 32, 0.001f, 2, 4, 2, 3});
   bool has_channel_difference = false;
@@ -213,10 +250,12 @@ TEST(CudaRenderer, GlassIorChangesGpuImageStatistics) {
   const RenderSettings settings{32, 32, 0.001f, 8, 4, 8, 4};
 
   Renderer low_ior_renderer;
+  ASSERT_TRUE(low_ior_renderer.set_backend(RendererBackendType::Cuda));
   glass.index_of_refraction = 1.1f;
   const Image low_ior = low_ior_renderer.render(scene, camera, settings);
 
   Renderer high_ior_renderer;
+  ASSERT_TRUE(high_ior_renderer.set_backend(RendererBackendType::Cuda));
   glass.index_of_refraction = 2.2f;
   const Image high_ior = high_ior_renderer.render(scene, camera, settings);
 
@@ -244,10 +283,12 @@ TEST(CudaRenderer, GlassAbsorptionChangesGpuImageStatistics) {
   const RenderSettings settings{32, 32, 0.001f, 8, 4, 8, 4};
 
   Renderer clear_renderer;
+  ASSERT_TRUE(clear_renderer.set_backend(RendererBackendType::Cuda));
   glass.absorption_density = 0.0f;
   const Image clear = clear_renderer.render(scene, camera, settings);
 
   Renderer dense_renderer;
+  ASSERT_TRUE(dense_renderer.set_backend(RendererBackendType::Cuda));
   glass.absorption_density = 3.0f;
   const Image dense = dense_renderer.render(scene, camera, settings);
 
@@ -271,6 +312,7 @@ TEST(CudaRenderer, GlassRemainsFiniteAtObliqueCameraAngle) {
                       {0.0f, 1.0f, 0.0f},
                       {0.0f, 0.0f, 0.0f}};
   Renderer renderer;
+  ASSERT_TRUE(renderer.set_backend(RendererBackendType::Cuda));
   const Image image = renderer.render(scene, camera,
                                       {32, 32, 0.001f, 8, 4, 8, 5});
 
@@ -289,6 +331,7 @@ TEST(CudaRenderer, EmissiveSphereCanIlluminateTheFloor) {
   scene.light.point.radiant_intensity = 0.0f;
 
   Renderer renderer;
+  ASSERT_TRUE(renderer.set_backend(RendererBackendType::Cuda));
   const Image image = renderer.render(scene, make_default_camera(1.0f),
                                       {32, 32, 0.001f, 1, 1, 1});
 
@@ -318,6 +361,7 @@ TEST(CudaRenderer, SingleSphereGlassWithEmissionRemainsFinite) {
   scene.light.point.radiant_intensity = 0.0f;
 
   Renderer renderer;
+  ASSERT_TRUE(renderer.set_backend(RendererBackendType::Cuda));
   const Image image = renderer.render(scene, make_default_camera(1.0f),
                                       {32, 32, 0.001f, 2, 4, 2, 4});
 

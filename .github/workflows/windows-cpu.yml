@@ -7,6 +7,9 @@ on:
 jobs:
   build-and-test:
     runs-on: windows-2025
+    strategy:
+      matrix:
+        configuration: [Debug, Release]
 
     steps:
       - name: Check out repository
@@ -15,18 +18,27 @@ jobs:
       - name: Set up MSVC development environment
         uses: ilammy/msvc-dev-cmd@v1
 
+      - name: Install clang-format
+        shell: pwsh
+        run: |
+          choco install llvm --no-progress --yes
+          "C:\Program Files\LLVM\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
       - name: Configure CPU GUI build
         run: >-
-          cmake -S . -B build/windows-ci
+          cmake -S . -B build/windows-ci-${{ matrix.configuration }}
           -G Ninja
-          -DCMAKE_BUILD_TYPE=Debug
+          -DCMAKE_BUILD_TYPE=${{ matrix.configuration }}
           -DBUILD_TESTING=ON
           -DRAYPALETTE_ENABLE_CUDA=OFF
           -DRAYPALETTE_BUILD_GUI=ON
           -DRAYPALETTE_FETCH_DEPENDENCIES=ON
 
+      - name: Check formatting
+        run: cmake --build build/windows-ci-${{ matrix.configuration }} --target format-check
+
       - name: Build
-        run: cmake --build build/windows-ci --parallel
+        run: cmake --build build/windows-ci-${{ matrix.configuration }} --parallel
 
       - name: Run tests
-        run: ctest --test-dir build/windows-ci --output-on-failure
+        run: ctest --test-dir build/windows-ci-${{ matrix.configuration }} --output-on-failure

@@ -36,8 +36,8 @@ if(RAYPALETTE_ENABLE_CUDA)
             "Detected CUDA ${CMAKE_CUDA_COMPILER_VERSION}.")
     endif()
 
-    set(CMAKE_CUDA_ARCHITECTURES 120 CACHE STRING
-        "RayPalette supports RTX 50 series GPUs (sm_120) only.")
+    set(CMAKE_CUDA_ARCHITECTURES 120-real CACHE STRING
+        "RayPalette supports RTX 50 series GPUs (sm_120) only." FORCE)
 endif()
 
 option(RAYPALETTE_BUILD_GUI "Build the native GUI application" OFF)
@@ -56,6 +56,7 @@ set(RAYPALETTE_FORMAT_FILES
     ${PROJECT_SOURCE_DIR}/src/render/light_sampling.hpp
     ${PROJECT_SOURCE_DIR}/src/render/material.hpp
     ${PROJECT_SOURCE_DIR}/src/render/ray.hpp
+    ${PROJECT_SOURCE_DIR}/src/render/renderer.cpp
     ${PROJECT_SOURCE_DIR}/src/render/renderer_cpu.cpp
     ${PROJECT_SOURCE_DIR}/src/render/renderer_cuda.cu
     ${PROJECT_SOURCE_DIR}/src/render/renderer.hpp
@@ -84,7 +85,18 @@ set(RAYPALETTE_FORMAT_FILES
     ${PROJECT_SOURCE_DIR}/tests/unit/vec3_test.cpp
 )
 
-find_program(RAYPALETTE_CLANG_FORMAT clang-format)
+if(WIN32)
+    find_program(RAYPALETTE_CLANG_FORMAT
+        NAMES clang-format clang-format.exe
+        HINTS
+            "$ENV{ProgramFiles}/LLVM/bin"
+            "$ENV{ProgramFiles}/Microsoft Visual Studio/2022/Community/VC/Tools/Llvm/x64/bin"
+            "$ENV{ProgramFiles}/Microsoft Visual Studio/2022/BuildTools/VC/Tools/Llvm/x64/bin"
+            "$ENV{ProgramFiles}/Microsoft Visual Studio/18/Community/VC/Tools/Llvm/x64/bin"
+    )
+else()
+    find_program(RAYPALETTE_CLANG_FORMAT NAMES clang-format)
+endif()
 if(RAYPALETTE_CLANG_FORMAT)
     add_custom_target(format
         COMMAND ${RAYPALETTE_CLANG_FORMAT} -i ${RAYPALETTE_FORMAT_FILES}
@@ -113,13 +125,14 @@ else()
     )
 endif()
 
-if(RAYPALETTE_ENABLE_CUDA)
-    set(RAYPALETTE_RENDERER_SOURCE src/render/renderer_cuda.cu)
-else()
-    set(RAYPALETTE_RENDERER_SOURCE src/render/renderer_cpu.cpp)
-endif()
+add_library(raypalette_renderer STATIC
+    src/render/renderer.cpp
+    src/render/renderer_cpu.cpp
+)
 
-add_library(raypalette_renderer STATIC ${RAYPALETTE_RENDERER_SOURCE})
+if(RAYPALETTE_ENABLE_CUDA)
+    target_sources(raypalette_renderer PRIVATE src/render/renderer_cuda.cu)
+endif()
 target_include_directories(raypalette_renderer PUBLIC ${PROJECT_SOURCE_DIR}/src)
 
 if(RAYPALETTE_ENABLE_CUDA)

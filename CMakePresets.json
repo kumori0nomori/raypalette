@@ -88,7 +88,7 @@
       "name": "windows-debug",
       "displayName": "Windows Debug",
       "inherits": "base",
-      "generator": "Visual Studio 17 2022",
+      "generator": "Visual Studio 18 2026",
       "architecture": "x64",
       "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
@@ -126,7 +126,7 @@
       "name": "windows-release",
       "displayName": "Windows Release",
       "inherits": "base",
-      "generator": "Visual Studio 17 2022",
+      "generator": "Visual Studio 18 2026",
       "architecture": "x64",
       "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {

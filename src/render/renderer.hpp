@@ -4,6 +4,8 @@
 #include "render/image.hpp"
 #include "render/scene.hpp"
 
+#include <memory>
+#include <string>
 #include <vector>
 
 namespace raypalette {
@@ -21,14 +23,44 @@ struct RenderSettings {
   int max_bounces = 1;
 };
 
+enum class RendererBackendType { Cpu, Cuda };
+
+class RendererBackend {
+public:
+  virtual ~RendererBackend() = default;
+  virtual Image render_frame(const Scene& scene, const Camera& camera,
+                             const RenderSettings& settings, int sample_offset,
+                             int samples_this_frame) = 0;
+};
+
+std::unique_ptr<RendererBackend> make_cpu_renderer();
+
+#ifdef RAYPALETTE_CUDA_BACKEND
+std::unique_ptr<RendererBackend> make_cuda_renderer();
+#endif
+
 class Renderer {
 public:
+  Renderer();
+  ~Renderer();
+  Renderer(Renderer&&) noexcept;
+  Renderer& operator=(Renderer&&) noexcept;
+
+  Renderer(const Renderer&) = delete;
+  Renderer& operator=(const Renderer&) = delete;
+
   Image render(const Scene& scene, const Camera& camera, const RenderSettings& settings);
   void reset_accumulation();
   int accumulated_samples() const;
   bool is_accumulation_complete(const RenderSettings& settings) const;
+  bool set_backend(RendererBackendType backend_type);
+  bool is_backend_available(RendererBackendType backend_type) const;
+  std::string backend_label(RendererBackendType backend_type) const;
+  RendererBackendType backend_type() const;
 
 private:
+  std::unique_ptr<RendererBackend> backend_;
+  RendererBackendType backend_type_ = RendererBackendType::Cpu;
   std::vector<Vec3> accumulated_pixels_;
   int accumulated_width_ = 0;
   int accumulated_height_ = 0;

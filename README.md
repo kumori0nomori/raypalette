@@ -34,6 +34,7 @@ sudo apt install clang-format
 
 - Visual Studio Community 2026 または Build Tools 2026
 - 「C++ によるデスクトップ開発」ワークロード、MSVC、Windows SDK
+- clang-format（Visual Studio LLVM toolsまたはLLVM公式パッケージ）
 - NVIDIA CUDA Toolkit 12.8 以降（GPU版をビルドする場合のみ）
 - OpenGLはWindows標準の`opengl32`を使用します。GLFWとDear ImGuiはCMakeが取得します。
 
@@ -81,6 +82,15 @@ cmake --preset windows-debug
 cmake --build --preset windows-debug
 ctest --preset windows-debug --output-on-failure
 .\build\windows-debug\Debug\raypalette_gui.exe
+```
+
+整形チェックを行う場合、Visual Studio InstallerでLLVM toolsを追加するか、LLVM公式
+パッケージをインストールします。Visual Studioに同梱された`clang-format.exe`はCMakeが
+標準配置から自動検出します。
+
+```powershell
+cmake --build build/windows-cpu-debug --target format-check
+cmake --build build/windows-cpu-debug --target format
 ```
 
 ## 3. コード整形
