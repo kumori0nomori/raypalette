@@ -243,6 +243,9 @@ void draw_controls(ControlsContext& context) {
         context.scene.light.area.height = area_size;
         context.request_render();
       }
+      if (ImGui::SliderInt("Area light samples", &context.settings.light_samples_per_frame, 4, 4)) {
+        context.request_render();
+      }
     }
     bool light_parameters_changed = false;
     if (context.scene.light.type != LightType::Directional) {
@@ -255,9 +258,6 @@ void draw_controls(ControlsContext& context) {
         ImGui::SliderFloat("Light theta", &context.light_polar.theta_degrees, 0.0f, 90.0f);
     light_parameters_changed |=
         ImGui::SliderFloat("Light phi", &context.light_polar.phi_degrees, -180.0f, 180.0f);
-    if (context.scene.light.type == LightType::RectArea) {
-      ImGui::TextDisabled("4 deterministic area-light samples.");
-    }
     if (light_parameters_changed) {
       const Vec3 color = light_color(context.scene.light);
       const float energy = light_energy(context.scene.light);
@@ -308,9 +308,6 @@ void draw_controls(ControlsContext& context) {
     }
     ImGui::EndDisabled();
     if (ImGui::SliderInt("Samples per pixel", &context.settings.samples_per_pixel, 1, 16)) {
-      context.request_render();
-    }
-    if (ImGui::SliderInt("Light samples", &context.settings.light_samples_per_frame, 1, 4)) {
       context.request_render();
     }
     if (ImGui::SliderInt("Target samples", &context.settings.target_samples_per_pixel, 1, 256)) {

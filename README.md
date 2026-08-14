@@ -87,6 +87,12 @@ Get-FileHash .\raypalette.exe -Algorithm SHA256
     | `Rectangular area` | 面から一方向に向かって光を放つ光源。 | 蛍光灯、窓から差し込む部屋の明かり |
     | `Directional (sun)` | 平行光源。空間全体に対して完全に平行な光を均一に降らせる。 | 太陽光 |
 
+    `Rectangular area`を選択した場合は、面光源のサンプリング回数も設定できます。
+
+    | 設定 | 説明 |
+    |---|---|
+    | `Area light samples` | 面光源をサンプリングする回数です。値を大きくすると影や照明のノイズが減りますが、計算時間が長くなります。 |
+
 - `Environment color`と`Environment intensity`: シーン全体を包む環境光の設定です。これは光源が直接届かない面への間接的な明るさを示します。
 
     | 設定 | 説明 |
@@ -100,7 +106,6 @@ Get-FileHash .\raypalette.exe -Algorithm SHA256
     |---|---|
     | `CPU/GPU` | NVIDIA GPUが利用可能ならGPUを、それ以外ではCPUを使用します。 |
     | `samples per pixel` | 1フレームで各ピクセルをサンプリングする回数です。 |
-    | `light samples` | 各交点で光源をサンプリングする回数です。 |
     | `target samples` | 累積レンダリングで目標とする総サンプル数です。 |
     | `max bounces` | 光線が反射・屈折できる最大回数です。 |
 
