@@ -61,9 +61,13 @@ ctest --preset linux-cpu-debug --output-on-failure
 
 ### 2.2. Windows 11
 
-Visual Studio 2022 の「Developer PowerShell for VS 2022」または同等の開発者用
+Visual Studio 2026 の「Developer PowerShell for VS 2026」または同等の開発用
 コマンドプロンプトから実行します。初回の構成ではFetchContentによる依存ライブラリの
 ダウンロードが発生するため、ネットワーク接続が必要です。
+
+ローカルではVisual Studioジェネレーターのpresetを使用します。GitHub Actionsでは
+Visual Studioのバージョンに依存しないよう、MSVC開発環境を自動検出してNinjaで同じ
+CPU + GUI構成をビルドします。
 
 ```powershell
 # CPU
