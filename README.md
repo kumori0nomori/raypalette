@@ -14,7 +14,7 @@ raypalette は、制御した照明下でイラストの色がどのように変
 - NVIDIA CUDA Toolkit 12.8 以降（GPU版をビルドする場合のみ）
 - GPU版を使わない場合は、CUDA ToolkitとNVIDIA GPUは不要
 
-### 1.2. Ubuntu 24.04（確認済み）
+### 1.2. Ubuntu 24.04
 
 - GCC 13.3
 - NVIDIA CUDA Toolkit 12.8.93
@@ -30,7 +30,7 @@ sudo apt install libgl1-mesa-dev libxrandr-dev libxinerama-dev libxcursor-dev li
 sudo apt install clang-format
 ```
 
-### 1.3. Windows 11（CPU版GUI確認対象）
+### 1.3. Windows 11
 
 - Visual Studio Community 2026 または Build Tools 2026
 - 「C++ によるデスクトップ開発」ワークロード、MSVC、Windows SDK
@@ -40,7 +40,7 @@ sudo apt install clang-format
 
 ## 2. 構成とビルド
 
-### 2.1. Ubuntu 24.04（確認済み）
+### 2.1. Ubuntu 24.04
 
 - UbuntuではGUI用presetを使用して構成、ビルド、テストを実行します。X11/OpenGL開発
 パッケージをインストールしてください。初回の構成ではFetchContentによる依存ライブラリ
@@ -84,8 +84,8 @@ ctest --preset windows-debug --output-on-failure
 .\build\windows-debug\Debug\raypalette.exe
 ```
 
-CPU版のRelease配布exeを作成する場合は、Git Bashから次を実行します。ビルドとCTestが
-成功した後、`dist/windows-cpu-release/raypalette.exe`へコピーされます。
+CPU版のRelease配布exeを作成する場合は、Git Bashから次を実行します。テストを含めない
+配布用ビルドが成功した後、`dist/windows-cpu-release/raypalette.exe`へコピーされます。
 配布ビルドはMSVCランタイムを静的リンクするため、Visual C++ Redistributableの別途
 インストールは不要です。Windows標準のOpenGL・Win32 DLLは使用します。
 
@@ -93,8 +93,8 @@ CPU版のRelease配布exeを作成する場合は、Git Bashから次を実行�
 bash scripts/package_windows_cpu.sh
 ```
 
-GPU版のRelease配布exeは、CUDA Toolkitと対応GPUがある環境で次を実行します。ビルドと
-CTestが成功した後、`dist/windows-gpu-release/raypalette.exe`へコピーされます。MSVC
+GPU版のRelease配布exeは、CUDA Toolkitと対応GPUがある環境で次を実行します。テストを
+含めない配布用ビルドが成功した後、`dist/windows-gpu-release/raypalette.exe`へコピーされます。MSVC
 ランタイムとCUDA runtimeは静的リンクされるため、別途DLLを同梱する必要はありません。
 利用者側にはRTX 50シリーズ対応のNVIDIAドライバが必要です。
 
@@ -113,7 +113,7 @@ cmake --build build/windows-cpu-debug --target format
 
 ## 3. コード整形
 
-### 3.1. Ubuntu 24.04（確認済み）
+### 3.1. Ubuntu 24.04
 
 Ubuntuでは`clang-format`をインストールしてから、任意のビルドディレクトリで
 整形または整形チェックを実行します。C++とCUDAのソースが対象です。
@@ -132,7 +132,7 @@ cmake --build build/linux-debug --target format-check  # 検査
 テストは CTest に登録されています。構成とビルドを完了した後、次のコマンドで
 すべてのテストを実行します。
 
-### 4.1. Ubuntu 24.04（確認済み）
+### 4.1. Ubuntu 24.04
 
 ```sh
 ctest --preset linux-debug --output-on-failure
@@ -175,3 +175,16 @@ Dear ImGui、GLFW、GoogleTest は、CMake の `FetchContent` を通じて
 また光源によって固有色がHSV色空間上でどのように変化するか？を右の`HSV Space`画面で3Dプロットとして確認できます。
 
 - <img src="./assets/screenshots/20260813_gui.png" alt="実行画面画像" title="実行画面" width="70%">
+
+## 7. ライセンス
+
+raypalette本体のソースコードとドキュメントは、[MIT License](LICENSE)の下で
+提供します。Windows配布exeに組み込まれるDear ImGuiとGLFWのライセンス通知は
+[THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt)に収録しています。
+
+GoogleTestはテスト専用の依存ライブラリです。配布用ビルドでは`BUILD_TESTING=OFF`
+として取得・構成しません。開発用ビルドでは、CMakeの`FetchContent`を通じて取得します。
+
+GPU版のビルドと実行にはNVIDIA CUDA Toolkitおよび対応するNVIDIAドライバが必要です。
+CUDA ToolkitとNVIDIAドライバはraypaletteのMIT Licenseの対象外で、それぞれの利用条件が
+適用されます。
