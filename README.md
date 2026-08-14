@@ -18,13 +18,16 @@ RayPalette は、制御した照明下でイラストの色がどのように変
 
 - GCC 13.3
 - NVIDIA CUDA Toolkit 12.8.93
-- 将来の GLFW/OpenGL GUI 用 X11・OpenGL 開発パッケージ
-
-Ubuntu で GLFW/OpenGL GUI をビルドする場合は、X11 と OpenGL の開発パッケージを
-インストールしてください。
+- GLFW/OpenGL GUI 用 X11・OpenGL 開発パッケージ
 
 ```sh
 sudo apt install libgl1-mesa-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
+```
+
+- clang-format
+
+```sh
+sudo apt install clang-format
 ```
 
 ### 1.3. Windows 11（対応予定）
@@ -36,94 +39,44 @@ sudo apt install libgl1-mesa-dev libxrandr-dev libxinerama-dev libxcursor-dev li
 
 ## 2. 構成とビルド
 
-初期の bootstrap ターゲットはネットワーク依存を持ちません。
-
 ### 2.1. Ubuntu 24.04（確認済み）
 
-CUDA版のDebugビルドは次のコマンドで構成、ビルド、テストを実行できます。
+- 次のコマンドで構成、ビルド、テストを実行できます。
 
 ```sh
+# GPU
 cmake --preset linux-debug
 cmake --build --preset linux-debug
-ctest --preset linux-debug
-```
+ctest --preset linux-debug --output-on-failure
 
-Release ビルドでは `linux-release` を使用します。
-
-```sh
-cmake --preset linux-release
-cmake --build --preset linux-release
-ctest --preset linux-release
-```
-
-Debug の bootstrap 実行ファイルは次のように起動します。
-
-```sh
-./build/linux-debug/raypalette
-```
-
-CUDA ToolkitやNVIDIA GPUがない環境では、CPU版を使用します。CPU版とCUDA版は
-別のビルドディレクトリとバイナリになります。
-
-```sh
+# CPU
 cmake --preset linux-cpu-debug
 cmake --build --preset linux-cpu-debug
 ctest --preset linux-cpu-debug --output-on-failure
-./build/linux-cpu-debug/raypalette
 ```
 
-GUI をビルドする場合は、Ubuntu の X11/OpenGL 開発パッケージをインストールした
+- GUI をビルドする場合は、Ubuntu の X11/OpenGL 開発パッケージをインストールした
 うえで、GUI 用 preset を使用します。初回の構成では FetchContent による依存ライブラリ
 のダウンロードが発生します。
 
 ```sh
+# GPU
 cmake --preset linux-gui-debug
 cmake --build --preset linux-gui-debug
+ctest --preset linux-gui-debug --output-on-failure
 ./build/linux-gui-debug/raypalette_gui
-```
 
-CPU版のGUIは次のpresetでビルドできます。CUDA Toolkitは不要です。
-
-```sh
+# CPU
 cmake --preset linux-cpu-gui-debug
 cmake --build --preset linux-cpu-gui-debug
+ctest --preset linux-cpu-gui-debug --output-on-failure
 ./build/linux-cpu-gui-debug/raypalette_gui
 ```
 
 ### 2.2. Windows 11（未検証）
 
 Visual Studio 2022 の「Developer PowerShell for VS 2022」または同等の開発者用
-コマンドプロンプトで、Debug ビルドを実行します。
-
-```powershell
-cmake --preset windows-debug
-cmake --build --preset windows-debug
-ctest --preset windows-debug
-```
-
-Release ビルドでは `windows-release` を使用します。
-
-```powershell
-cmake --preset windows-release
-cmake --build --preset windows-release
-ctest --preset windows-release
-```
-
-Visual Studio generator では構成別サブディレクトリが作られるため、Debug の
-bootstrap 実行ファイルは次のパスになります。
-
-```powershell
-.\build\windows-debug\Debug\raypalette.exe
-```
-
-GUI は Windows 用 preset で構成・ビルドします。Visual Studio 2022 の Developer
-PowerShell から実行してください。
-
-```powershell
-cmake --preset windows-gui-debug
-cmake --build --preset windows-gui-debug
-.\build\windows-gui-debug\Debug\raypalette_gui.exe
-```
+コマンドプロンプトで、Debug ビルドを実行します。 TBD
 
 ### 3. コード整形
 
@@ -133,9 +86,8 @@ Ubuntuでは`clang-format`をインストールしてから、任意のビルド
 整形または整形チェックを実行します。C++とCUDAのソースが対象です。
 
 ```sh
-sudo apt install clang-format
-cmake --build build/linux-cpu-debug --target format
-cmake --build build/linux-cpu-debug --target format-check
+cmake --build build/linux-debug --target format        # 修正
+cmake --build build/linux-debug --target format-check  # 検査
 ```
 
 `format`はファイルを直接更新し、`format-check`は差分がある場合に失敗します。
@@ -151,11 +103,6 @@ cmake --build build/linux-cpu-debug --target format-check
 
 ```sh
 ctest --preset linux-debug --output-on-failure
-```
-
-Release ビルドでは `linux-release` を使用します。
-
-```sh
 ctest --preset linux-release --output-on-failure
 ```
 
@@ -172,15 +119,7 @@ CTestのテスト一覧には含まれません。
 
 ### 4.2. Windows 11（未検証）
 
-```powershell
-ctest --preset windows-debug --output-on-failure
-```
-
-Release ビルドでは `windows-release` を使用します。
-
-```powershell
-ctest --preset windows-release --output-on-failure
-```
+TBD
 
 ## 5. 依存ライブラリ
 

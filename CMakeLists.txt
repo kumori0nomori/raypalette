@@ -45,7 +45,6 @@ option(RAYPALETTE_FETCH_DEPENDENCIES "Fetch optional third-party dependencies" O
 
 set(RAYPALETTE_FORMAT_FILES
     ${PROJECT_SOURCE_DIR}/src/app/application.cpp
-    ${PROJECT_SOURCE_DIR}/src/app/main.cpp
     ${PROJECT_SOURCE_DIR}/src/math/color.hpp
     ${PROJECT_SOURCE_DIR}/src/math/polar.hpp
     ${PROJECT_SOURCE_DIR}/src/math/vec3.hpp
@@ -95,10 +94,6 @@ else()
     )
 endif()
 
-add_executable(raypalette
-    src/app/main.cpp
-)
-
 add_library(raypalette_renderer STATIC src/render/renderer.cu)
 target_include_directories(raypalette_renderer PUBLIC ${PROJECT_SOURCE_DIR}/src)
 
@@ -106,14 +101,6 @@ if(RAYPALETTE_ENABLE_CUDA)
     target_compile_definitions(raypalette_renderer PRIVATE RAYPALETTE_CUDA_BACKEND=1)
 else()
     set_source_files_properties(src/render/renderer.cu PROPERTIES LANGUAGE CXX)
-endif()
-
-target_compile_features(raypalette PRIVATE cxx_std_17)
-
-if(MSVC)
-    target_compile_options(raypalette PRIVATE /W4 /permissive-)
-else()
-    target_compile_options(raypalette PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
 if(BUILD_TESTING)
