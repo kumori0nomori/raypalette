@@ -91,93 +91,6 @@ raypalette::Vec3 sphere_material_color(const raypalette::Material& material) {
   return material.base_color;
 }
 
-struct HsvPlotCanvas {
-  ImDrawList* draw_list;
-  ImVec2 minimum;
-  ImVec2 maximum;
-  ImVec2 center;
-  float scale;
-  const raypalette::ui::HsvPlotView& view;
-
-  raypalette::ui::HsvScreenPoint project(const raypalette::Vec3& position) const {
-    return raypalette::ui::project_hsv_position(position, center, scale, view);
-  }
-};
-
-void draw_hsv_point_cloud(const HsvPlotCanvas& canvas,
-                          const std::vector<raypalette::ui::HsvPlotPoint>& points) {
-  struct ProjectedPlotPoint {
-    raypalette::ui::HsvScreenPoint screen;
-    raypalette::Vec3 color;
-  };
-  std::vector<ProjectedPlotPoint> projected_points;
-  projected_points.reserve(points.size());
-  for (const raypalette::ui::HsvPlotPoint& point : points) {
-    projected_points.push_back({canvas.project(point.cylinder_position), point.display_color});
-  }
-  std::sort(projected_points.begin(), projected_points.end(),
-            [](const ProjectedPlotPoint& left, const ProjectedPlotPoint& right) {
-              return left.screen.depth < right.screen.depth;
-            });
-  for (const ProjectedPlotPoint& point : projected_points) {
-    canvas.draw_list->AddCircleFilled(point.screen.position, 2.5f,
-                                      raypalette::ui::hsv_plot_color(point.color, 0.62f));
-  }
-}
-
-void draw_hsv_marker(const HsvPlotCanvas& canvas, const char* label, const raypalette::Vec3& color,
-                     bool diamond, float radius) {
-  const raypalette::ui::HsvScreenPoint screen =
-      canvas.project(raypalette::hsv_cylinder_position(raypalette::srgb_to_hsv(color)));
-  const ImU32 marker_color = raypalette::ui::hsv_plot_color(color);
-  const ImU32 outline_color = ImGui::GetColorU32(ImGuiCol_Text);
-  if (diamond) {
-    canvas.draw_list->AddQuadFilled(ImVec2(screen.position.x, screen.position.y - radius),
-                                    ImVec2(screen.position.x + radius, screen.position.y),
-                                    ImVec2(screen.position.x, screen.position.y + radius),
-                                    ImVec2(screen.position.x - radius, screen.position.y),
-                                    marker_color);
-    canvas.draw_list->AddQuad(ImVec2(screen.position.x, screen.position.y - radius),
-                              ImVec2(screen.position.x + radius, screen.position.y),
-                              ImVec2(screen.position.x, screen.position.y + radius),
-                              ImVec2(screen.position.x - radius, screen.position.y), outline_color,
-                              1.5f);
-  } else {
-    canvas.draw_list->AddCircleFilled(screen.position, radius, marker_color);
-    canvas.draw_list->AddCircle(screen.position, radius, outline_color, 16, 1.5f);
-  }
-  canvas.draw_list->AddText(ImVec2(screen.position.x + radius + 3.0f, screen.position.y - 7.0f),
-                            outline_color, label);
-}
-
-void draw_hsv_reference_markers(const HsvPlotCanvas& canvas, const raypalette::Vec3& sphere_color,
-                                const raypalette::Vec3& light_color_value, float light_energy_value,
-                                float light_energy_maximum,
-                                const std::vector<raypalette::ui::PaletteColor>& palette,
-                                int selected_palette_index) {
-  draw_hsv_marker(canvas, "Sphere", sphere_color, true, 7.0f);
-  const float normalized_energy =
-      light_energy_maximum > 0.0f
-          ? std::log1pf(std::max(0.0f, light_energy_value)) / std::log1pf(light_energy_maximum)
-          : 0.0f;
-  draw_hsv_marker(canvas, "Light", light_color_value, false, 5.0f + 6.0f * normalized_energy);
-  for (int index = 0; index < static_cast<int>(palette.size()); ++index) {
-    const raypalette::ui::HsvScreenPoint screen = canvas.project(
-        raypalette::hsv_cylinder_position(raypalette::srgb_to_hsv(palette[index].color)));
-    const float radius = selected_palette_index == index ? 7.0f : 5.0f;
-    const ImU32 outline_color = ImGui::GetColorU32(ImGuiCol_Text);
-    canvas.draw_list->AddRectFilled(ImVec2(screen.position.x - radius, screen.position.y - radius),
-                                    ImVec2(screen.position.x + radius, screen.position.y + radius),
-                                    raypalette::ui::hsv_plot_color(palette[index].color));
-    canvas.draw_list->AddRect(ImVec2(screen.position.x - radius, screen.position.y - radius),
-                              ImVec2(screen.position.x + radius, screen.position.y + radius),
-                              outline_color, 0.0f, 0, 1.5f);
-    const std::string label = "P" + std::to_string(index);
-    canvas.draw_list->AddText(ImVec2(screen.position.x + radius + 3.0f, screen.position.y - 7.0f),
-                              outline_color, label.c_str());
-  }
-}
-
 void handle_hsv_view_input(bool hovered, raypalette::ui::HsvPlotView& view) {
   if (hovered && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
     const ImVec2 drag_delta = ImGui::GetIO().MouseDelta;
@@ -189,7 +102,8 @@ void handle_hsv_view_input(bool hovered, raypalette::ui::HsvPlotView& view) {
   }
 }
 
-void select_hue_at_mouse(const HsvPlotCanvas& canvas, raypalette::ui::HsvHueSection& section) {
+void select_hue_at_mouse(const raypalette::ui::HsvPlotCanvas& canvas,
+                         raypalette::ui::HsvHueSection& section) {
   constexpr int kHueSelectionSamples = 360;
   const ImVec2 mouse = ImGui::GetIO().MousePos;
   float nearest_distance_squared = 1.0e30f;
@@ -221,7 +135,7 @@ void select_hue_at_mouse(const HsvPlotCanvas& canvas, raypalette::ui::HsvHueSect
   section.hue = selected_hue;
 }
 
-void draw_hsv_base_color_wheel(const HsvPlotCanvas& canvas) {
+void draw_hsv_base_color_wheel(const raypalette::ui::HsvPlotCanvas& canvas) {
   constexpr int kRingSegments = 32;
   constexpr int kColorWheelRings = 12;
   constexpr float kTwoPi = 6.28318530717958647692f;
@@ -249,7 +163,7 @@ void draw_hsv_base_color_wheel(const HsvPlotCanvas& canvas) {
   }
 }
 
-void draw_hsv_cylinder_guides(const HsvPlotCanvas& canvas, ImU32 guide_color) {
+void draw_hsv_cylinder_guides(const raypalette::ui::HsvPlotCanvas& canvas, ImU32 guide_color) {
   constexpr int kRingSegments = 32;
   constexpr float kTwoPi = 6.28318530717958647692f;
   for (int segment = 0; segment < kRingSegments; ++segment) {
@@ -272,7 +186,8 @@ void draw_hsv_cylinder_guides(const HsvPlotCanvas& canvas, ImU32 guide_color) {
   }
 }
 
-void draw_hsv_section_boundary(const HsvPlotCanvas& canvas, float hue, ImU32 outline_color) {
+void draw_hsv_section_boundary(const raypalette::ui::HsvPlotCanvas& canvas, float hue,
+                               ImU32 outline_color) {
   const raypalette::ui::HsvScreenPoint lower =
       canvas.project(raypalette::ui::cylinder_position_at_hue(hue, 1.0f, 0.0f));
   const raypalette::ui::HsvScreenPoint upper =
@@ -280,7 +195,7 @@ void draw_hsv_section_boundary(const HsvPlotCanvas& canvas, float hue, ImU32 out
   canvas.draw_list->AddLine(lower.position, upper.position, outline_color, 1.0f);
 }
 
-void draw_hsv_section_plane(const HsvPlotCanvas& canvas,
+void draw_hsv_section_plane(const raypalette::ui::HsvPlotCanvas& canvas,
                             const raypalette::ui::HsvHueSection& section) {
   const raypalette::ui::HsvScreenPoint bottom_center = canvas.project({0.0f, 0.0f, 0.0f});
   const raypalette::ui::HsvScreenPoint bottom_edge =
@@ -329,16 +244,18 @@ void draw_hsv_space(const std::vector<raypalette::ui::HsvPlotPoint>& points,
   draw_list->AddRect(canvas_min, canvas_max, ImGui::GetColorU32(ImGuiCol_Border));
   const float scale = canvas_size * 0.31f * view.zoom;
   const ImU32 guide_color = ImGui::GetColorU32(ImGuiCol_TextDisabled);
-  const HsvPlotCanvas canvas{draw_list, canvas_min, canvas_max, center, scale, view};
+  const raypalette::ui::HsvPlotCanvas canvas{draw_list, canvas_min, canvas_max,
+                                             center,    scale,      view};
   if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
     select_hue_at_mouse(canvas, section);
   }
   draw_hsv_base_color_wheel(canvas);
   draw_hsv_cylinder_guides(canvas, guide_color);
   draw_hsv_section_plane(canvas, section);
-  draw_hsv_point_cloud(canvas, points);
-  draw_hsv_reference_markers(canvas, sphere_color, light_color_value, light_energy_value,
-                             light_energy_maximum, palette, selected_palette_index);
+  raypalette::ui::draw_hsv_point_cloud(canvas, points);
+  raypalette::ui::draw_hsv_reference_markers(canvas, sphere_color, light_color_value,
+                                             light_energy_value, light_energy_maximum, palette,
+                                             selected_palette_index);
   draw_list->AddText(ImVec2(canvas_min.x + 8.0f, canvas_min.y + 8.0f), guide_color,
                      "HSV cylinder: H angle, S radius, V height");
   draw_list->AddText(ImVec2(canvas_min.x + 8.0f, canvas_max.y - 22.0f), guide_color,
