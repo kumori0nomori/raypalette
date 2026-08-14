@@ -113,13 +113,14 @@ else()
     )
 endif()
 
-if(RAYPALETTE_ENABLE_CUDA)
-    set(RAYPALETTE_RENDERER_SOURCE src/render/renderer_cuda.cu)
-else()
-    set(RAYPALETTE_RENDERER_SOURCE src/render/renderer_cpu.cpp)
-endif()
+add_library(raypalette_renderer STATIC
+    src/render/renderer.cpp
+    src/render/renderer_cpu.cpp
+)
 
-add_library(raypalette_renderer STATIC ${RAYPALETTE_RENDERER_SOURCE})
+if(RAYPALETTE_ENABLE_CUDA)
+    target_sources(raypalette_renderer PRIVATE src/render/renderer_cuda.cu)
+endif()
 target_include_directories(raypalette_renderer PUBLIC ${PROJECT_SOURCE_DIR}/src)
 
 if(RAYPALETTE_ENABLE_CUDA)
