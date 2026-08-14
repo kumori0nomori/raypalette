@@ -1,2 +1,5 @@
 add_subdirectory(unit)
-add_subdirectory(cuda)
+add_subdirectory(cpu)
+if(RAYPALETTE_ENABLE_CUDA)
+	add_subdirectory(cuda)
+endif()

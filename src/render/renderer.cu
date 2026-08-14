@@ -1,13 +1,29 @@
 #include "render/renderer.hpp"
 
+#if defined(RAYPALETTE_CUDA_BACKEND)
 #include <cuda_runtime.h>
+#endif
 
 #include <stdexcept>
 
 namespace raypalette {
 namespace {
 
-__device__ bool hit_scene(const Scene &scene,
+#if defined(RAYPALETTE_CUDA_BACKEND)
+#define RAYPALETTE_RENDER_FUNCTION __device__
+#else
+#define RAYPALETTE_RENDER_FUNCTION
+#endif
+
+RAYPALETTE_HOST_DEVICE unsigned int float_bits(float value) {
+  union {
+    float value;
+    unsigned int bits;
+  } representation{value};
+  return representation.bits;
+}
+
+RAYPALETTE_RENDER_FUNCTION bool hit_scene(const Scene &scene,
                           const Ray &ray,
                           float minimum_distance,
                           float maximum_distance,
@@ -27,37 +43,39 @@ __device__ bool hit_scene(const Scene &scene,
   return hit_anything;
 }
 
-__device__ Vec3 trace_color(const Scene &,
-                            const Ray &,
-                            float, 
-                            int,
-                            int,
-                            float,
-                            int);
+RAYPALETTE_RENDER_FUNCTION Vec3 trace_color(
+  const Scene &,
+  const Ray &,
+  float, 
+  int,
+  int,
+  float,
+  int
+);
 
-__device__ unsigned int sample_hash(unsigned int value);
+RAYPALETTE_RENDER_FUNCTION unsigned int sample_hash(unsigned int value);
 
 constexpr int kMaxLightSampleCount = 4;
 constexpr float kPi = 3.14159265358979323846f;
 
-__device__ float power_heuristic(float first_pdf, float second_pdf) {
+RAYPALETTE_RENDER_FUNCTION float power_heuristic(float first_pdf, float second_pdf) {
   const float first_squared = first_pdf * first_pdf;
   const float second_squared = second_pdf * second_pdf;
   return first_squared / fmaxf(1.0e-12f, first_squared + second_squared);
 }
 
-__device__ Vec3 emitted_radiance(const Material &material) {
+RAYPALETTE_RENDER_FUNCTION Vec3 emitted_radiance(const Material &material) {
   if (material.type != MaterialType::Emissive) {
     return {};
   }
   return material.emission_color * material.emission_strength;
 }
 
-__device__ Vec3 environment_radiance(const Scene &scene) {
+RAYPALETTE_RENDER_FUNCTION Vec3 environment_radiance(const Scene &scene) {
   return scene.environment.color * scene.environment.intensity;
 }
 
-__device__ bool visible_to_light(const Scene &scene, const HitRecord &record,
+RAYPALETTE_RENDER_FUNCTION bool visible_to_light(const Scene &scene, const HitRecord &record,
                                  const LightSample &light_sample,
                                  float minimum_distance) {
   const Ray shadow_ray{record.position + minimum_distance * record.normal,
@@ -74,7 +92,7 @@ __device__ bool visible_to_light(const Scene &scene, const HitRecord &record,
 // This function is mainly for RectArea lights, which require multiple samples.
 // For Point and Directional lights, only one sample is needed,
 // and the function will return true only for sample_index == 0.
-__device__ bool try_sample_light(const Scene &scene,
+RAYPALETTE_RENDER_FUNCTION bool try_sample_light(const Scene &scene,
                                  const HitRecord &record,
                                  int sample_index,
                                  LightSample &sample) {
@@ -96,7 +114,7 @@ __device__ bool try_sample_light(const Scene &scene,
 }
 
 // Samples the single scene sphere as an emissive surface.
-__device__ bool try_sample_emissive_sphere(const Scene &scene,
+RAYPALETTE_RENDER_FUNCTION bool try_sample_emissive_sphere(const Scene &scene,
                                            const HitRecord &record,
                                            int sample_index,
                                            float random_value,
@@ -108,7 +126,7 @@ __device__ bool try_sample_emissive_sphere(const Scene &scene,
       sample_index >= kMaxLightSampleCount) {
     return false;
   }
-  const unsigned int seed = __float_as_uint(random_value) +
+  const unsigned int seed = float_bits(random_value) +
     static_cast<unsigned int>(sample_index * 7919);
   const float sample_u =
     static_cast<float>(sample_hash(seed) & 0x00ffffffU) / 16777216.0f;
@@ -142,7 +160,7 @@ __device__ bool try_sample_emissive_sphere(const Scene &scene,
   return true;
 }
 
-__device__ Vec3 cosine_sample_direction(const Vec3 &normal, float u, float v) {
+RAYPALETTE_RENDER_FUNCTION Vec3 cosine_sample_direction(const Vec3 &normal, float u, float v) {
   constexpr float pi = 3.14159265358979323846f;
   const float radius = sqrtf(v);
   const float phi = 2.0f * pi * u;
@@ -155,7 +173,7 @@ __device__ Vec3 cosine_sample_direction(const Vec3 &normal, float u, float v) {
                     local.z * normal);
 }
 
-__device__ Vec3 evaluate_diffuse_lighting(const Scene &scene,
+RAYPALETTE_RENDER_FUNCTION Vec3 evaluate_diffuse_lighting(const Scene &scene,
                                           const HitRecord &record,
                                           const Material &material,
                                           float minimum_distance,
@@ -205,7 +223,7 @@ __device__ Vec3 evaluate_diffuse_lighting(const Scene &scene,
   return ambient + direct_light + emissive_direct_light;
 }
 
-__device__ Vec3 evaluate_metal_lighting(const Scene &scene,
+RAYPALETTE_RENDER_FUNCTION Vec3 evaluate_metal_lighting(const Scene &scene,
                                         const Ray &ray,
                                         const HitRecord &record,
                                         const Material &material,
@@ -247,11 +265,11 @@ __device__ Vec3 evaluate_metal_lighting(const Scene &scene,
   return direct_reflection;
 }
 
-__device__ Vec3 next_diffuse_direction(const HitRecord &record,
+RAYPALETTE_RENDER_FUNCTION Vec3 next_diffuse_direction(const HitRecord &record,
                                        float random_value,
                                        int bounce,
                                        float &next_random) {
-  const unsigned int random_bits = __float_as_uint(random_value);
+  const unsigned int random_bits = float_bits(random_value);
   const float secondary_random =
       static_cast<float>(sample_hash(
           random_bits + static_cast<unsigned int>(bounce + 1)) &
@@ -261,7 +279,7 @@ __device__ Vec3 next_diffuse_direction(const HitRecord &record,
   return cosine_sample_direction(record.normal, random_value, secondary_random);
 }
 
-__device__ void scatter_dielectric(const Ray &ray,
+RAYPALETTE_RENDER_FUNCTION void scatter_dielectric(const Ray &ray,
                                    const HitRecord &record,
                                    const Material &material,
                                    float random_value,
@@ -290,7 +308,7 @@ __device__ void scatter_dielectric(const Ray &ray,
   }
 }
 
-__device__ void scatter_metal(const Ray &ray,
+RAYPALETTE_RENDER_FUNCTION void scatter_metal(const Ray &ray,
                               const HitRecord &record,
                               const Material &material,
                               float random_value,
@@ -308,7 +326,7 @@ __device__ void scatter_metal(const Ray &ray,
     return;
   }
 
-  const unsigned int seed = __float_as_uint(random_value) +
+  const unsigned int seed = float_bits(random_value) +
                             static_cast<unsigned int>(bounce * 7919);
   const float sample_u =
       static_cast<float>(sample_hash(seed) & 0x00ffffffU) / 16777216.0f;
@@ -352,7 +370,7 @@ __device__ void scatter_metal(const Ray &ray,
   bsdf_pdf = ggx_reflection_pdf(n_dot_h, v_dot_h, material.roughness);
 }
 
-__device__ float emissive_sphere_pdf(const Scene &scene,
+RAYPALETTE_RENDER_FUNCTION float emissive_sphere_pdf(const Scene &scene,
                                      const Ray &ray,
                                      const HitRecord &record) {
   const Vec3 surface_normal = normalized(record.position - scene.sphere.center);
@@ -365,7 +383,7 @@ __device__ float emissive_sphere_pdf(const Scene &scene,
   return record.distance * record.distance / (light_cosine * area);
 }
 
-__device__ bool apply_russian_roulette(Vec3 &throughput,
+RAYPALETTE_RENDER_FUNCTION bool apply_russian_roulette(Vec3 &throughput,
                                        float &random_value,
                                        int bounce) {
   constexpr int kRouletteStartBounce = 3;
@@ -377,7 +395,7 @@ __device__ bool apply_russian_roulette(Vec3 &throughput,
   const float survival_probability =
       fminf(0.95f, fmaxf(0.05f, maximum_throughput));
   const bool survives = random_value < survival_probability;
-  const unsigned int random_bits = __float_as_uint(random_value);
+  const unsigned int random_bits = float_bits(random_value);
   random_value = static_cast<float>(sample_hash(
       random_bits + static_cast<unsigned int>(bounce * 104729)) &
                                       0x00ffffffU) / 16777216.0f;
@@ -388,7 +406,7 @@ __device__ bool apply_russian_roulette(Vec3 &throughput,
   return true;
 }
 
-__device__ Vec3 trace_color(const Scene &scene,
+RAYPALETTE_RENDER_FUNCTION Vec3 trace_color(const Scene &scene,
                             const Ray &ray,
                             float minimum_distance,
                             int bounce_count,
@@ -485,7 +503,7 @@ __device__ Vec3 trace_color(const Scene &scene,
       const float offset_sign = dot(direction, record.normal) > 0.0f ? 1.0f : -1.0f;
       current_ray = {record.position + offset_sign * minimum_distance * record.normal,
                      direction};
-      const unsigned int random_bits = __float_as_uint(path_random);
+      const unsigned int random_bits = float_bits(path_random);
       path_random = static_cast<float>(sample_hash(
           random_bits + static_cast<unsigned int>(bounce + 1)) &
                                       0x00ffffffU) / 16777216.0f;
@@ -501,7 +519,7 @@ __device__ Vec3 trace_color(const Scene &scene,
 
 // Function to generate a pseudo-random sample value
 // based on pixel index, sample index, and channel.
-__device__ unsigned int sample_hash(unsigned int value) {
+RAYPALETTE_RENDER_FUNCTION unsigned int sample_hash(unsigned int value) {
   value ^= value >> 16;
   value *= 0x7feb352dU;
   value ^= value >> 15;
@@ -510,7 +528,7 @@ __device__ unsigned int sample_hash(unsigned int value) {
 }
 
 // Function to generate a pseudo-random sample value in the range [0, 1).
-__device__ float sample_unit(unsigned int pixel_index,
+RAYPALETTE_RENDER_FUNCTION float sample_unit(unsigned int pixel_index,
                              unsigned int sample_index,
                              unsigned int channel) {
   const unsigned int seed = pixel_index * 9781U + sample_index * 6271U +
@@ -518,6 +536,7 @@ __device__ float sample_unit(unsigned int pixel_index,
   return static_cast<float>(sample_hash(seed) & 0x00ffffffU) / 16777216.0f;
 }
 
+#if defined(RAYPALETTE_CUDA_BACKEND)
 __global__ void render_kernel(Vec3 *pixels,
                               Scene scene,
                               Camera camera,
@@ -554,6 +573,7 @@ void check_cuda(cudaError_t error) {
     throw std::runtime_error(cudaGetErrorString(error));
   }
 }
+#endif
 
 } // namespace
 
@@ -595,6 +615,7 @@ Image Renderer::render(const Scene &scene,
     return image;
   }
 
+#if defined(RAYPALETTE_CUDA_BACKEND)
   Vec3 *device_pixels = nullptr;
   check_cuda(cudaMalloc(&device_pixels, pixel_count * sizeof(Vec3)));
   const dim3 threads(8, 8);
@@ -608,6 +629,33 @@ Image Renderer::render(const Scene &scene,
   check_cuda(cudaMemcpy(frame_pixels.data(), device_pixels,
                         pixel_count * sizeof(Vec3), cudaMemcpyDeviceToHost));
   check_cuda(cudaFree(device_pixels));
+#else
+  std::vector<Vec3> frame_pixels(pixel_count);
+  for (int y = 0; y < settings.height; ++y) {
+    for (int x = 0; x < settings.width; ++x) {
+      Vec3 accumulated_color;
+      const unsigned int pixel_index =
+          static_cast<unsigned int>(y * settings.width + x);
+      for (int sample_index = 0; sample_index < samples_this_frame;
+           ++sample_index) {
+        const unsigned int global_sample = static_cast<unsigned int>(
+            accumulated_samples_ + sample_index);
+        const float subpixel_x = sample_unit(pixel_index, global_sample, 0);
+        const float subpixel_y = sample_unit(pixel_index, global_sample, 1);
+        const float fresnel_random =
+            sample_unit(pixel_index, global_sample, 2);
+        const float u = (static_cast<float>(x) + subpixel_x) / settings.width;
+        const float v = (static_cast<float>(y) + subpixel_y) / settings.height;
+        const Ray ray = camera_ray(camera, u, v);
+        accumulated_color += trace_color(
+            scene, ray, settings.minimum_distance, 0, settings.max_bounces,
+            fresnel_random, settings.light_samples_per_frame);
+      }
+      frame_pixels[static_cast<std::size_t>(y) * settings.width + x] =
+          accumulated_color * (1.0f / samples_this_frame);
+    }
+  }
+#endif
 
   const int old_sample_count = accumulated_samples_;
   const int new_sample_count = old_sample_count + samples_this_frame;

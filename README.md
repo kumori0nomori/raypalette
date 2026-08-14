@@ -10,7 +10,8 @@ RayPalette は、制御した照明下でイラストの色がどのように変
 
 - CMake 3.24 以降
 - C++17 コンパイラ
-- NVIDIA CUDA Toolkit 12.8 以降（RTX 50 シリーズ / `sm_120`）
+- NVIDIA CUDA Toolkit 12.8 以降（GPU版をビルドする場合のみ）
+- GPU版を使わない場合は、CUDA ToolkitとNVIDIA GPUは不要
 
 ### 1.2. Ubuntu 24.04（確認済み）
 
@@ -38,7 +39,7 @@ sudo apt install libgl1-mesa-dev libxrandr-dev libxinerama-dev libxcursor-dev li
 
 ### 2.1. Ubuntu 24.04（確認済み）
 
-Debug ビルドは次のコマンドで構成、ビルド、テストを実行できます。
+CUDA版のDebugビルドは次のコマンドで構成、ビルド、テストを実行できます。
 
 ```sh
 cmake --preset linux-debug
@@ -60,6 +61,16 @@ Debug の bootstrap 実行ファイルは次のように起動します。
 ./build/linux-debug/raypalette
 ```
 
+CUDA ToolkitやNVIDIA GPUがない環境では、CPU版を使用します。CPU版とCUDA版は
+別のビルドディレクトリとバイナリになります。
+
+```sh
+cmake --preset linux-cpu-debug
+cmake --build --preset linux-cpu-debug
+ctest --preset linux-cpu-debug --output-on-failure
+./build/linux-cpu-debug/raypalette
+```
+
 GUI をビルドする場合は、Ubuntu の X11/OpenGL 開発パッケージをインストールした
 うえで、GUI 用 preset を使用します。初回の構成では FetchContent による依存ライブラリ
 のダウンロードが発生します。
@@ -68,6 +79,14 @@ GUI をビルドする場合は、Ubuntu の X11/OpenGL 開発パッケージを
 cmake --preset linux-gui-debug
 cmake --build --preset linux-gui-debug
 ./build/linux-gui-debug/raypalette_gui
+```
+
+CPU版のGUIは次のpresetでビルドできます。CUDA Toolkitは不要です。
+
+```sh
+cmake --preset linux-cpu-gui-debug
+cmake --build --preset linux-cpu-gui-debug
+./build/linux-cpu-gui-debug/raypalette_gui
 ```
 
 ### 2.2. Windows 11（未検証）
@@ -128,9 +147,10 @@ ctest --preset linux-release --output-on-failure
 ctest --preset linux-debug -R Vec3 --output-on-failure
 ```
 
-現在は、ベクトル・色・極座標の GoogleTest unit test と、共有数学ヘッダを
-`nvcc` で検査する CUDA コンパイルチェックを実行します。CUDA コンパイルチェックは
-ビルド時に実行され、CTest のテスト一覧には含まれません。
+現在は、ベクトル・色・極座標のGoogleTest unit testとCPU Renderer testを実行します。
+CUDA版では加えて、共有数学ヘッダを`nvcc`で検査するCUDAコンパイルチェックと、
+GPU Renderer testを実行します。CUDAコンパイルチェックはビルド時に実行され、
+CTestのテスト一覧には含まれません。
 
 ### 3.2. Windows 11（未検証）
 
@@ -154,6 +174,11 @@ Dear ImGui、GLFW、GoogleTest は、CMake の `FetchContent` を通じて
 先に上記の GUI 用パッケージをインストールしてから有効にしてください。
 
 ## 5. 実行結果
+
+CPU版はCUDA版と同じレンダリング機能を提供しますが、一般に大幅に低速です。
+CPU版でGUIを確認する場合は、解像度、サンプル数、最大バウンス数を小さくして
+実行してください。
+
 左の`RayPalette Controls`画面でシーンの設定を行うと、その結果は逐次右の`Preview`画面へと反映されます。
 また`Preview`画面でマウスをクリックするとその下側の`Palette`タブにそのuv位置の色を追加します。
 `Palette`に追加された各色のHEXコードを選択して`Ctrl+C`を行うことで貼り付けすることが可能です。

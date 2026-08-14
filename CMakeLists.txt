@@ -3,27 +3,42 @@ cmake_minimum_required(VERSION 3.24)
 project(RayPalette
     VERSION 0.1.0
     DESCRIPTION "A lightweight CUDA renderer for illustration color studies"
-    LANGUAGES CXX CUDA
+    LANGUAGES CXX
 )
 
 include(CTest)
+include(CheckLanguage)
+
+option(RAYPALETTE_ENABLE_CUDA "Build the CUDA renderer" ON)
+
+if(RAYPALETTE_ENABLE_CUDA)
+    check_language(CUDA)
+    if(NOT CMAKE_CUDA_COMPILER)
+        message(FATAL_ERROR
+            "RAYPALETTE_ENABLE_CUDA=ON requires a CUDA Toolkit. "
+            "Configure with -DRAYPALETTE_ENABLE_CUDA=OFF for the CPU renderer.")
+    endif()
+    enable_language(CUDA)
+endif()
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-set(CMAKE_CUDA_STANDARD 17)
-set(CMAKE_CUDA_STANDARD_REQUIRED ON)
-set(CMAKE_CUDA_EXTENSIONS OFF)
+if(RAYPALETTE_ENABLE_CUDA)
+    set(CMAKE_CUDA_STANDARD 17)
+    set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+    set(CMAKE_CUDA_EXTENSIONS OFF)
 
-if(CMAKE_CUDA_COMPILER_VERSION VERSION_LESS 12.8)
-    message(FATAL_ERROR
-        "RayPalette requires CUDA Toolkit 12.8 or newer for RTX 50 series (sm_120). "
-        "Detected CUDA ${CMAKE_CUDA_COMPILER_VERSION}.")
+    if(CMAKE_CUDA_COMPILER_VERSION VERSION_LESS 12.8)
+        message(FATAL_ERROR
+            "RayPalette requires CUDA Toolkit 12.8 or newer for RTX 50 series (sm_120). "
+            "Detected CUDA ${CMAKE_CUDA_COMPILER_VERSION}.")
+    endif()
+
+    set(CMAKE_CUDA_ARCHITECTURES 120 CACHE STRING
+        "RayPalette supports RTX 50 series GPUs (sm_120) only.")
 endif()
-
-set(CMAKE_CUDA_ARCHITECTURES 120 CACHE STRING
-    "RayPalette supports RTX 50 series GPUs (sm_120) only." FORCE)
 
 option(RAYPALETTE_BUILD_GUI "Build the native GUI application" OFF)
 option(RAYPALETTE_FETCH_DEPENDENCIES "Fetch optional third-party dependencies" OFF)
@@ -32,10 +47,14 @@ add_executable(raypalette
     src/app/main.cpp
 )
 
-add_library(raypalette_renderer STATIC
-    src/render/renderer.cu
-)
+add_library(raypalette_renderer STATIC src/render/renderer.cu)
 target_include_directories(raypalette_renderer PUBLIC ${PROJECT_SOURCE_DIR}/src)
+
+if(RAYPALETTE_ENABLE_CUDA)
+    target_compile_definitions(raypalette_renderer PRIVATE RAYPALETTE_CUDA_BACKEND=1)
+else()
+    set_source_files_properties(src/render/renderer.cu PROPERTIES LANGUAGE CXX)
+endif()
 
 target_compile_features(raypalette PRIVATE cxx_std_17)
 
@@ -51,10 +70,12 @@ if(BUILD_TESTING)
     add_subdirectory(tests)
 endif()
 
-add_library(raypalette_cuda_compile_check OBJECT
-    tests/cuda/math_compile_check.cu
-)
-target_include_directories(raypalette_cuda_compile_check PRIVATE ${PROJECT_SOURCE_DIR}/src)
+if(RAYPALETTE_ENABLE_CUDA)
+    add_library(raypalette_cuda_compile_check OBJECT
+        tests/cuda/math_compile_check.cu
+    )
+    target_include_directories(raypalette_cuda_compile_check PRIVATE ${PROJECT_SOURCE_DIR}/src)
+endif()
 
 if(RAYPALETTE_FETCH_DEPENDENCIES)
     include(cmake/Dependencies.cmake)
@@ -94,4 +115,8 @@ if(RAYPALETTE_BUILD_GUI)
     )
 endif()
 
-message(STATUS "RayPalette CUDA target architecture: sm_${CMAKE_CUDA_ARCHITECTURES}")
+if(RAYPALETTE_ENABLE_CUDA)
+    message(STATUS "RayPalette CUDA target architecture: sm_${CMAKE_CUDA_ARCHITECTURES}")
+else()
+    message(STATUS "RayPalette renderer backend: CPU")
+endif()

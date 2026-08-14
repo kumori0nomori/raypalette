@@ -27,9 +27,29 @@
       }
     },
     {
+      "name": "linux-cpu-debug",
+      "displayName": "Linux CPU Debug",
+      "inherits": "base",
+      "generator": "Unix Makefiles",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "RAYPALETTE_ENABLE_CUDA": "OFF"
+      }
+    },
+    {
       "name": "linux-gui-debug",
       "displayName": "Linux GUI Debug",
       "inherits": "linux-debug",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "RAYPALETTE_BUILD_GUI": "ON",
+        "RAYPALETTE_FETCH_DEPENDENCIES": "ON"
+      }
+    },
+    {
+      "name": "linux-cpu-gui-debug",
+      "displayName": "Linux CPU GUI Debug",
+      "inherits": "linux-cpu-debug",
       "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
         "RAYPALETTE_BUILD_GUI": "ON",
@@ -46,9 +66,29 @@
       }
     },
     {
+      "name": "linux-cpu-release",
+      "displayName": "Linux CPU Release",
+      "inherits": "base",
+      "generator": "Unix Makefiles",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "RAYPALETTE_ENABLE_CUDA": "OFF"
+      }
+    },
+    {
       "name": "linux-gui-release",
       "displayName": "Linux GUI Release",
       "inherits": "linux-release",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "RAYPALETTE_BUILD_GUI": "ON",
+        "RAYPALETTE_FETCH_DEPENDENCIES": "ON"
+      }
+    },
+    {
+      "name": "linux-cpu-gui-release",
+      "displayName": "Linux CPU GUI Release",
+      "inherits": "linux-cpu-release",
       "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
         "RAYPALETTE_BUILD_GUI": "ON",
@@ -113,8 +153,18 @@
       "configuration": "Debug"
     },
     {
+      "name": "linux-cpu-debug",
+      "configurePreset": "linux-cpu-debug",
+      "configuration": "Debug"
+    },
+    {
       "name": "linux-gui-debug",
       "configurePreset": "linux-gui-debug",
+      "configuration": "Debug"
+    },
+    {
+      "name": "linux-cpu-gui-debug",
+      "configurePreset": "linux-cpu-gui-debug",
       "configuration": "Debug"
     },
     {
@@ -123,8 +173,18 @@
       "configuration": "Release"
     },
     {
+      "name": "linux-cpu-release",
+      "configurePreset": "linux-cpu-release",
+      "configuration": "Release"
+    },
+    {
       "name": "linux-gui-release",
       "configurePreset": "linux-gui-release",
+      "configuration": "Release"
+    },
+    {
+      "name": "linux-cpu-gui-release",
+      "configurePreset": "linux-cpu-gui-release",
       "configuration": "Release"
     },
     {
@@ -158,8 +218,24 @@
       }
     },
     {
+      "name": "linux-cpu-debug",
+      "configurePreset": "linux-cpu-debug",
+      "configuration": "Debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
       "name": "linux-gui-debug",
       "configurePreset": "linux-gui-debug",
+      "configuration": "Debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "linux-cpu-gui-debug",
+      "configurePreset": "linux-cpu-gui-debug",
       "configuration": "Debug",
       "output": {
         "outputOnFailure": true
@@ -174,8 +250,24 @@
       }
     },
     {
+      "name": "linux-cpu-release",
+      "configurePreset": "linux-cpu-release",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
       "name": "linux-gui-release",
       "configurePreset": "linux-gui-release",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "linux-cpu-gui-release",
+      "configurePreset": "linux-cpu-gui-release",
       "configuration": "Release",
       "output": {
         "outputOnFailure": true
