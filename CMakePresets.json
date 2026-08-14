@@ -66,6 +66,25 @@
       }
     },
     {
+      "name": "windows-cpu-debug",
+      "displayName": "Windows CPU Debug",
+      "inherits": "base",
+      "generator": "Visual Studio 18 2026",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "RAYPALETTE_ENABLE_CUDA": "OFF",
+        "RAYPALETTE_BUILD_GUI": "ON",
+        "RAYPALETTE_FETCH_DEPENDENCIES": "ON"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
       "name": "windows-debug",
       "displayName": "Windows Debug",
       "inherits": "base",
@@ -75,6 +94,25 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "RAYPALETTE_ENABLE_CUDA": "ON",
+        "RAYPALETTE_BUILD_GUI": "ON",
+        "RAYPALETTE_FETCH_DEPENDENCIES": "ON"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "windows-cpu-release",
+      "displayName": "Windows CPU Release",
+      "inherits": "base",
+      "generator": "Visual Studio 18 2026",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "RAYPALETTE_ENABLE_CUDA": "OFF",
         "RAYPALETTE_BUILD_GUI": "ON",
         "RAYPALETTE_FETCH_DEPENDENCIES": "ON"
       },
@@ -126,9 +164,19 @@
       "configuration": "Release"
     },
     {
+      "name": "windows-cpu-debug",
+      "configurePreset": "windows-cpu-debug",
+      "configuration": "Debug"
+    },
+    {
       "name": "windows-debug",
       "configurePreset": "windows-debug",
       "configuration": "Debug"
+    },
+    {
+      "name": "windows-cpu-release",
+      "configurePreset": "windows-cpu-release",
+      "configuration": "Release"
     },
     {
       "name": "windows-release",
@@ -170,9 +218,25 @@
       }
     },
     {
+      "name": "windows-cpu-debug",
+      "configurePreset": "windows-cpu-debug",
+      "configuration": "Debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
       "name": "windows-debug",
       "configurePreset": "windows-debug",
       "configuration": "Debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "windows-cpu-release",
+      "configurePreset": "windows-cpu-release",
+      "configuration": "Release",
       "output": {
         "outputOnFailure": true
       }

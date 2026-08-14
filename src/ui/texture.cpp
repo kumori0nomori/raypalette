@@ -1,5 +1,19 @@
 #include "ui/texture.hpp"
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
+#include <GL/gl.h>
+
+#ifndef GL_CLAMP_TO_EDGE
+#define GL_CLAMP_TO_EDGE 0x812F
+#endif
+
+#ifndef GL_RGB32F
+#define GL_RGB32F 0x8815
+#endif
+
 #include "math/color.hpp"
 
 namespace raypalette::ui {
