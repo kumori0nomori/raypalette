@@ -43,6 +43,58 @@ endif()
 option(RAYPALETTE_BUILD_GUI "Build the native GUI application" OFF)
 option(RAYPALETTE_FETCH_DEPENDENCIES "Fetch optional third-party dependencies" OFF)
 
+set(RAYPALETTE_FORMAT_FILES
+    ${PROJECT_SOURCE_DIR}/src/app/application.cpp
+    ${PROJECT_SOURCE_DIR}/src/app/main.cpp
+    ${PROJECT_SOURCE_DIR}/src/math/color.hpp
+    ${PROJECT_SOURCE_DIR}/src/math/polar.hpp
+    ${PROJECT_SOURCE_DIR}/src/math/vec3.hpp
+    ${PROJECT_SOURCE_DIR}/src/render/camera.hpp
+    ${PROJECT_SOURCE_DIR}/src/render/geometry.hpp
+    ${PROJECT_SOURCE_DIR}/src/render/image.hpp
+    ${PROJECT_SOURCE_DIR}/src/render/light.hpp
+    ${PROJECT_SOURCE_DIR}/src/render/material.hpp
+    ${PROJECT_SOURCE_DIR}/src/render/ray.hpp
+    ${PROJECT_SOURCE_DIR}/src/render/renderer.cu
+    ${PROJECT_SOURCE_DIR}/src/render/renderer.hpp
+    ${PROJECT_SOURCE_DIR}/src/render/scene.hpp
+    ${PROJECT_SOURCE_DIR}/tests/cpu/renderer_test.cpp
+    ${PROJECT_SOURCE_DIR}/tests/unit/color_test.cpp
+    ${PROJECT_SOURCE_DIR}/tests/unit/geometry_test.cpp
+    ${PROJECT_SOURCE_DIR}/tests/unit/polar_test.cpp
+    ${PROJECT_SOURCE_DIR}/tests/unit/scene_test.cpp
+    ${PROJECT_SOURCE_DIR}/tests/unit/vec3_test.cpp
+)
+
+find_program(RAYPALETTE_CLANG_FORMAT clang-format)
+if(RAYPALETTE_CLANG_FORMAT)
+    add_custom_target(format
+        COMMAND ${RAYPALETTE_CLANG_FORMAT} -i ${RAYPALETTE_FORMAT_FILES}
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+        COMMENT "Formatting C++ and CUDA sources with clang-format"
+        VERBATIM
+    )
+    add_custom_target(format-check
+        COMMAND ${RAYPALETTE_CLANG_FORMAT} --dry-run --Werror ${RAYPALETTE_FORMAT_FILES}
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+        COMMENT "Checking C++ and CUDA formatting with clang-format"
+        VERBATIM
+    )
+else()
+    add_custom_target(format
+        COMMAND ${CMAKE_COMMAND} -E echo
+            "clang-format was not found; install it to use the format target."
+        COMMAND ${CMAKE_COMMAND} -E false
+        VERBATIM
+    )
+    add_custom_target(format-check
+        COMMAND ${CMAKE_COMMAND} -E echo
+            "clang-format was not found; install it to use the format-check target."
+        COMMAND ${CMAKE_COMMAND} -E false
+        VERBATIM
+    )
+endif()
+
 add_executable(raypalette
     src/app/main.cpp
 )

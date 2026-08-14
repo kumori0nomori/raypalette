@@ -59,48 +59,36 @@ struct LightSample {
   float pdf = 0.0f;
 };
 
-RAYPALETTE_HOST_DEVICE inline Light make_point_light(
-    const PolarCoordinates &polar,
-    const Vec3 &origin,
-    const Vec3 &color,
-    float radiant_intensity) {
+RAYPALETTE_HOST_DEVICE inline Light make_point_light(const PolarCoordinates& polar,
+                                                     const Vec3& origin, const Vec3& color,
+                                                     float radiant_intensity) {
   Light light;
   light.type = LightType::Point;
-  light.point.position = origin + polar_to_cartesian(polar.radius,
-                                                     polar.theta_degrees,
-                                                     polar.phi_degrees);
+  light.point.position =
+      origin + polar_to_cartesian(polar.radius, polar.theta_degrees, polar.phi_degrees);
   light.point.color = color;
   light.point.radiant_intensity = radiant_intensity;
   return light;
 }
 
-RAYPALETTE_HOST_DEVICE inline Light make_directional_light(
-    float theta_degrees,
-    float phi_degrees,
-    const Vec3 &color,
-    float irradiance) {
+RAYPALETTE_HOST_DEVICE inline Light make_directional_light(float theta_degrees, float phi_degrees,
+                                                           const Vec3& color, float irradiance) {
   Light light;
   light.type = LightType::Directional;
   light.directional.color = color;
   light.directional.irradiance = irradiance;
-  light.directional.direction_to_light = normalized(
-      polar_to_cartesian(1.0f, theta_degrees, phi_degrees));
+  light.directional.direction_to_light =
+      normalized(polar_to_cartesian(1.0f, theta_degrees, phi_degrees));
   return light;
 }
 
-RAYPALETTE_HOST_DEVICE inline Light make_rect_area_light(
-    const PolarCoordinates &polar,
-    const Vec3 &origin,
-    const Vec3 &area_normal,
-    float width, 
-    float height, 
-    const Vec3 &color,
-    float radiance) {
+RAYPALETTE_HOST_DEVICE inline Light
+make_rect_area_light(const PolarCoordinates& polar, const Vec3& origin, const Vec3& area_normal,
+                     float width, float height, const Vec3& color, float radiance) {
   Light light;
   light.type = LightType::RectArea;
-  light.area.position = origin + polar_to_cartesian(polar.radius, 
-                                                    polar.theta_degrees,
-                                                    polar.phi_degrees);
+  light.area.position =
+      origin + polar_to_cartesian(polar.radius, polar.theta_degrees, polar.phi_degrees);
   light.area.color = color;
   light.area.radiance = radiance;
   light.area.normal = normalized(area_normal);
@@ -109,32 +97,29 @@ RAYPALETTE_HOST_DEVICE inline Light make_rect_area_light(
   return light;
 }
 
-RAYPALETTE_HOST_DEVICE inline bool is_valid_light(const Light &light) {
+RAYPALETTE_HOST_DEVICE inline bool is_valid_light(const Light& light) {
   constexpr float minimum_direction_length_squared = 1.0e-12f;
   switch (light.type) {
   case LightType::Point:
-      return is_unit_color(light.point.color) &&
-        is_finite(light.point.position) &&
-        light.point.radiant_intensity >= 0.0f;
+    return is_unit_color(light.point.color) && is_finite(light.point.position) &&
+           light.point.radiant_intensity >= 0.0f;
   case LightType::Directional:
-      return is_unit_color(light.directional.color) &&
-        is_finite(light.directional.direction_to_light) &&
-        length_squared(light.directional.direction_to_light) >
-       minimum_direction_length_squared &&
-        light.directional.irradiance >= 0.0f;
+    return is_unit_color(light.directional.color) &&
+           is_finite(light.directional.direction_to_light) &&
+           length_squared(light.directional.direction_to_light) >
+               minimum_direction_length_squared &&
+           light.directional.irradiance >= 0.0f;
   case LightType::RectArea:
-      return is_unit_color(light.area.color) && is_finite(light.area.position) &&
-        is_finite(light.area.normal) &&
-        length_squared(light.area.normal) > minimum_direction_length_squared &&
-        light.area.radiance >= 0.0f && light.area.width > 0.0f &&
-        light.area.height > 0.0f;
+    return is_unit_color(light.area.color) && is_finite(light.area.position) &&
+           is_finite(light.area.normal) &&
+           length_squared(light.area.normal) > minimum_direction_length_squared &&
+           light.area.radiance >= 0.0f && light.area.width > 0.0f && light.area.height > 0.0f;
   }
   return false;
 }
 
-RAYPALETTE_HOST_DEVICE inline bool sample_light(const Light &light,
-                                                const Vec3 &surface_position,
-                                                LightSample &sample) {
+RAYPALETTE_HOST_DEVICE inline bool sample_light(const Light& light, const Vec3& surface_position,
+                                                LightSample& sample) {
   constexpr float minimum_distance_squared = 1.0e-12f;
   constexpr float infinite_distance = 1.0e30f;
   if (!is_valid_light(light)) {
@@ -151,8 +136,7 @@ RAYPALETTE_HOST_DEVICE inline bool sample_light(const Light &light,
     const float inverse_distance = 1.0f / sqrtf(distance_squared);
     sample.direction_to_light = offset * inverse_distance;
     sample.distance = distance_squared * inverse_distance;
-    sample.radiance =
-      light.point.color * (light.point.radiant_intensity / distance_squared);
+    sample.radiance = light.point.color * (light.point.radiant_intensity / distance_squared);
     sample.pdf = 0.0f;
     return true;
   }
@@ -168,25 +152,22 @@ RAYPALETTE_HOST_DEVICE inline bool sample_light(const Light &light,
   return false;
 }
 
-RAYPALETTE_HOST_DEVICE inline bool sample_area_light(
-    const Light &light, const Vec3 &surface_position, float sample_u,
-    float sample_v, LightSample &sample) {
+RAYPALETTE_HOST_DEVICE inline bool sample_area_light(const Light& light,
+                                                     const Vec3& surface_position, float sample_u,
+                                                     float sample_v, LightSample& sample) {
   constexpr float minimum_distance_squared = 1.0e-12f;
-  if (!is_valid_light(light) || light.type != LightType::RectArea ||
-      sample_u < -0.5f || sample_u > 0.5f || sample_v < -0.5f ||
-      sample_v > 0.5f) {
+  if (!is_valid_light(light) || light.type != LightType::RectArea || sample_u < -0.5f ||
+      sample_u > 0.5f || sample_v < -0.5f || sample_v > 0.5f) {
     return false;
   }
 
   const Vec3 normal = normalized(light.area.normal);
-  const Vec3 reference_axis = fabsf(normal.y) < 0.999f
-                                  ? Vec3{0.0f, 1.0f, 0.0f}
-                                  : Vec3{1.0f, 0.0f, 0.0f};
+  const Vec3 reference_axis =
+      fabsf(normal.y) < 0.999f ? Vec3{0.0f, 1.0f, 0.0f} : Vec3{1.0f, 0.0f, 0.0f};
   const Vec3 tangent = normalized(cross(reference_axis, normal));
   const Vec3 bitangent = cross(normal, tangent);
-  const Vec3 light_position =
-      light.area.position + tangent * (sample_u * light.area.width) +
-      bitangent * (sample_v * light.area.height);
+  const Vec3 light_position = light.area.position + tangent * (sample_u * light.area.width) +
+                              bitangent * (sample_v * light.area.height);
   const Vec3 offset = light_position - surface_position;
   const float distance_squared = length_squared(offset);
   if (distance_squared <= minimum_distance_squared) {
@@ -201,9 +182,8 @@ RAYPALETTE_HOST_DEVICE inline bool sample_area_light(
   if (light_cosine <= 0.0f || area <= 0.0f) {
     return false;
   }
-  sample.radiance = light.area.color *
-                    (light.area.radiance * area * light_cosine /
-                     distance_squared);
+  sample.radiance =
+      light.area.color * (light.area.radiance * area * light_cosine / distance_squared);
   sample.pdf = distance_squared / (light_cosine * area);
   return true;
 }

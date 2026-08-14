@@ -10,6 +10,7 @@ RayPalette は、制御した照明下でイラストの色がどのように変
 
 - CMake 3.24 以降
 - C++17 コンパイラ
+- clang-format 14 以降（ソース整形を行う場合）
 - NVIDIA CUDA Toolkit 12.8 以降（GPU版をビルドする場合のみ）
 - GPU版を使わない場合は、CUDA ToolkitとNVIDIA GPUは不要
 
@@ -124,12 +125,29 @@ cmake --build --preset windows-gui-debug
 .\build\windows-gui-debug\Debug\raypalette_gui.exe
 ```
 
-## 3. テスト
+### 3. コード整形
+
+### 3.1. Ubuntu 24.04（確認済み）
+
+Ubuntuでは`clang-format`をインストールしてから、任意のビルドディレクトリで
+整形または整形チェックを実行します。C++とCUDAのソースが対象です。
+
+```sh
+sudo apt install clang-format
+cmake --build build/linux-cpu-debug --target format
+cmake --build build/linux-cpu-debug --target format-check
+```
+
+`format`はファイルを直接更新し、`format-check`は差分がある場合に失敗します。
+整形設定は[.clang-format](.clang-format)にあります。既存ファイルの一括整形は
+意図しない大きな差分になり得るため、導入時には変更内容を確認してください。
+
+## 4. テスト
 
 テストは CTest に登録されています。構成とビルドを完了した後、次のコマンドで
 すべてのテストを実行します。
 
-### 3.1. Ubuntu 24.04（確認済み）
+### 4.1. Ubuntu 24.04（確認済み）
 
 ```sh
 ctest --preset linux-debug --output-on-failure
@@ -152,7 +170,7 @@ CUDA版では加えて、共有数学ヘッダを`nvcc`で検査するCUDAコン
 GPU Renderer testを実行します。CUDAコンパイルチェックはビルド時に実行され、
 CTestのテスト一覧には含まれません。
 
-### 3.2. Windows 11（未検証）
+### 4.2. Windows 11（未検証）
 
 ```powershell
 ctest --preset windows-debug --output-on-failure
@@ -164,7 +182,7 @@ Release ビルドでは `windows-release` を使用します。
 ctest --preset windows-release --output-on-failure
 ```
 
-## 4. 依存ライブラリ
+## 5. 依存ライブラリ
 
 Dear ImGui、GLFW、GoogleTest は、CMake の `FetchContent` を通じて
 `cmake/Dependencies.cmake` に不変の上流コミット SHA で定義しています。
@@ -173,7 +191,7 @@ Dear ImGui、GLFW、GoogleTest は、CMake の `FetchContent` を通じて
 以降は CMake がビルドツリー内に展開したキャッシュを再利用します。Ubuntu では、
 先に上記の GUI 用パッケージをインストールしてから有効にしてください。
 
-## 5. 実行結果
+## 6. 実行結果
 
 CPU版はCUDA版と同じレンダリング機能を提供しますが、一般に大幅に低速です。
 CPU版でGUIを確認する場合は、解像度、サンプル数、最大バウンス数を小さくして

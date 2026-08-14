@@ -22,14 +22,12 @@ struct Scene {
   EnvironmentLight environment;
 };
 
-RAYPALETTE_HOST_DEVICE inline bool is_valid_scene(const Scene &scene) {
+RAYPALETTE_HOST_DEVICE inline bool is_valid_scene(const Scene& scene) {
   return is_valid_material(scene.materials[kSphereMaterialIndex]) &&
-         is_valid_material(scene.materials[kFloorMaterialIndex]) &&
-         scene.sphere.radius > 0.0f && is_finite(scene.sphere.center) &&
-         is_finite(scene.floor.point) &&
-         length_squared(scene.floor.normal) > 1.0e-12f &&
-         is_valid_light(scene.light) && is_unit_color(scene.environment.color) &&
-         scene.environment.intensity >= 0.0f;
+         is_valid_material(scene.materials[kFloorMaterialIndex]) && scene.sphere.radius > 0.0f &&
+         is_finite(scene.sphere.center) && is_finite(scene.floor.point) &&
+         length_squared(scene.floor.normal) > 1.0e-12f && is_valid_light(scene.light) &&
+         is_unit_color(scene.environment.color) && scene.environment.intensity >= 0.0f;
 }
 
 inline Scene make_default_scene() {

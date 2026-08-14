@@ -38,10 +38,10 @@ TEST(SphereIntersection, RejectsMissAndInvalidRadius) {
   const Ray ray{{0.0f, 0.0f, -3.0f}, {0.0f, 0.0f, 1.0f}};
   HitRecord record;
 
-  EXPECT_FALSE(hit_sphere({{3.0f, 0.0f, 0.0f}, 1.0f, 0}, ray,
-                          kMinimumDistance, kMaximumDistance, record));
-  EXPECT_FALSE(hit_sphere({{0.0f, 0.0f, 0.0f}, 0.0f, 0}, ray,
-                          kMinimumDistance, kMaximumDistance, record));
+  EXPECT_FALSE(
+      hit_sphere({{3.0f, 0.0f, 0.0f}, 1.0f, 0}, ray, kMinimumDistance, kMaximumDistance, record));
+  EXPECT_FALSE(
+      hit_sphere({{0.0f, 0.0f, 0.0f}, 0.0f, 0}, ray, kMinimumDistance, kMaximumDistance, record));
 }
 
 TEST(PlaneIntersection, ReturnsFloorHitAndMaterial) {
@@ -61,10 +61,9 @@ TEST(PlaneIntersection, RejectsParallelRaysAndZeroNormal) {
   const Ray parallel_ray{{0.0f, 1.0f, 0.0f}, {1.0f, 0.0f, 0.0f}};
   HitRecord record;
 
-  EXPECT_FALSE(hit_plane(floor, parallel_ray, kMinimumDistance,
+  EXPECT_FALSE(hit_plane(floor, parallel_ray, kMinimumDistance, kMaximumDistance, record));
+  EXPECT_FALSE(hit_plane({{0.0f, 0.0f, 0.0f}, {}, 0}, parallel_ray, kMinimumDistance,
                          kMaximumDistance, record));
-  EXPECT_FALSE(hit_plane({{0.0f, 0.0f, 0.0f}, {}, 0}, parallel_ray,
-                         kMinimumDistance, kMaximumDistance, record));
 }
 
 } // namespace

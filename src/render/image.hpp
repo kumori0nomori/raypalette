@@ -12,7 +12,7 @@ struct Image {
   int height = 0;
   std::vector<Vec3> pixels;
 
-  const Vec3 &at(int x, int y) const {
+  const Vec3& at(int x, int y) const {
     return pixels[static_cast<std::size_t>(y) * width + x];
   }
 };

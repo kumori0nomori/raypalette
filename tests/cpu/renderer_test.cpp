@@ -7,10 +7,9 @@
 namespace raypalette {
 namespace {
 
-bool image_is_finite(const Image &image) {
-  for (const Vec3 &pixel : image.pixels) {
-    if (!std::isfinite(pixel.x) || !std::isfinite(pixel.y) ||
-        !std::isfinite(pixel.z)) {
+bool image_is_finite(const Image& image) {
+  for (const Vec3& pixel : image.pixels) {
+    if (!std::isfinite(pixel.x) || !std::isfinite(pixel.y) || !std::isfinite(pixel.z)) {
       return false;
     }
   }
@@ -19,9 +18,8 @@ bool image_is_finite(const Image &image) {
 
 TEST(CpuRenderer, RendersFiniteCanonicalImage) {
   Renderer renderer;
-  const Image image = renderer.render(make_default_scene(),
-                                      make_default_camera(1.0f),
-                                      {8, 8, 0.001f});
+  const Image image =
+      renderer.render(make_default_scene(), make_default_camera(1.0f), {8, 8, 0.001f});
 
   ASSERT_EQ(image.width, 8);
   ASSERT_EQ(image.height, 8);
@@ -33,10 +31,8 @@ TEST(CpuRenderer, ReturnsEnvironmentForRayMiss) {
   Scene scene = make_default_scene();
   scene.environment.color = {0.25f, 0.5f, 0.75f};
   scene.environment.intensity = 1.0f;
-  const Camera miss_camera{{0.0f, 1.0f, 5.0f},
-                           {0.0f, 1.0f, 6.0f},
-                           {0.0f, 0.0f, 0.0f},
-                           {0.0f, 0.0f, 0.0f}};
+  const Camera miss_camera{
+      {0.0f, 1.0f, 5.0f}, {0.0f, 1.0f, 6.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}};
   Renderer renderer;
   const Image image = renderer.render(scene, miss_camera, {1, 1, 0.001f});
 
@@ -61,7 +57,7 @@ TEST(CpuRenderer, AccumulatesProgressiveFrames) {
 
 TEST(CpuRenderer, RendersEmissionWithoutDirectLight) {
   Scene scene = make_default_scene();
-  Material &sphere_material = scene.materials[kSphereMaterialIndex];
+  Material& sphere_material = scene.materials[kSphereMaterialIndex];
   sphere_material.type = MaterialType::Emissive;
   sphere_material.base_color = {};
   sphere_material.emission_color = {0.2f, 0.4f, 0.8f};
@@ -70,9 +66,8 @@ TEST(CpuRenderer, RendersEmissionWithoutDirectLight) {
   scene.light.point.radiant_intensity = 0.0f;
 
   Renderer renderer;
-  const Image image = renderer.render(scene, make_default_camera(1.0f),
-                                      {8, 8, 0.001f, 1, 1});
-  const Vec3 &center_pixel = image.pixels[4 * image.width + 4];
+  const Image image = renderer.render(scene, make_default_camera(1.0f), {8, 8, 0.001f, 1, 1});
+  const Vec3& center_pixel = image.pixels[4 * image.width + 4];
 
   EXPECT_NEAR(center_pixel.x, 0.4f, 1.0e-5f);
   EXPECT_NEAR(center_pixel.y, 0.8f, 1.0e-5f);
