@@ -103,7 +103,7 @@ cmake --build build/linux-debug --target format-check  # 検査
 
 ```sh
 ctest --preset linux-debug --output-on-failure
-ctest --preset linux-release --output-on-failure
+ctest --preset linux-gui-debug --output-on-failure
 ```
 
 特定のテスト群だけを実行する場合は、`-R` に正規表現を指定します。
