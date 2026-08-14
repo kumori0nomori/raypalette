@@ -6,6 +6,10 @@
 
 namespace raypalette {
 
+#ifdef RAYPALETTE_CUDA_BACKEND
+bool cuda_backend_available();
+#endif
+
 Renderer::Renderer() : backend_(make_cpu_renderer()) {}
 
 Renderer::~Renderer() = default;
@@ -72,9 +76,12 @@ bool Renderer::is_accumulation_complete(const RenderSettings& settings) const {
   return accumulated_samples_ >= settings.target_samples_per_pixel;
 }
 
-void Renderer::set_backend(RendererBackendType backend_type) {
+bool Renderer::set_backend(RendererBackendType backend_type) {
+  if (!is_backend_available(backend_type)) {
+    return false;
+  }
   if (backend_type == backend_type_) {
-    return;
+    return true;
   }
 #ifdef RAYPALETTE_CUDA_BACKEND
   if (backend_type == RendererBackendType::Cuda) {
@@ -83,17 +90,26 @@ void Renderer::set_backend(RendererBackendType backend_type) {
     backend_ = make_cpu_renderer();
   }
 #else
-  if (backend_type == RendererBackendType::Cuda) {
-    throw std::runtime_error("CUDA backend is not included in this build");
-  }
   backend_ = make_cpu_renderer();
 #endif
   backend_type_ = backend_type;
   reset_accumulation();
+  return true;
 }
 
 RendererBackendType Renderer::backend_type() const {
   return backend_type_;
+}
+
+bool Renderer::is_backend_available(RendererBackendType backend_type) const {
+  if (backend_type == RendererBackendType::Cpu) {
+    return true;
+  }
+#ifdef RAYPALETTE_CUDA_BACKEND
+  return cuda_backend_available();
+#else
+  return false;
+#endif
 }
 
 } // namespace raypalette

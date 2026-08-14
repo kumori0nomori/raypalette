@@ -27,6 +27,17 @@ TEST(CpuRenderer, RendersFiniteCanonicalImage) {
   EXPECT_TRUE(image_is_finite(image));
 }
 
+TEST(RendererBackend, UsesCpuByDefaultAndRejectsUnavailableCuda) {
+  Renderer renderer;
+
+  EXPECT_EQ(renderer.backend_type(), RendererBackendType::Cpu);
+  EXPECT_TRUE(renderer.is_backend_available(RendererBackendType::Cpu));
+  EXPECT_FALSE(renderer.is_backend_available(RendererBackendType::Cuda));
+  EXPECT_FALSE(renderer.set_backend(RendererBackendType::Cuda));
+  EXPECT_EQ(renderer.backend_type(), RendererBackendType::Cpu);
+  EXPECT_TRUE(renderer.set_backend(RendererBackendType::Cpu));
+}
+
 TEST(CpuRenderer, ReturnsEnvironmentForRayMiss) {
   Scene scene = make_default_scene();
   scene.environment.color = {0.25f, 0.5f, 0.75f};

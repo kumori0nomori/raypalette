@@ -52,7 +52,8 @@ public:
   void reset_accumulation();
   int accumulated_samples() const;
   bool is_accumulation_complete(const RenderSettings& settings) const;
-  void set_backend(RendererBackendType backend_type);
+  bool set_backend(RendererBackendType backend_type);
+  bool is_backend_available(RendererBackendType backend_type) const;
   RendererBackendType backend_type() const;
 
 private:

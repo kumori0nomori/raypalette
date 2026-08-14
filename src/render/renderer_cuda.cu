@@ -4,6 +4,7 @@
 #include <cuda_runtime.h>
 
 #include <stdexcept>
+#include <utility>
 
 namespace raypalette {
 namespace {
@@ -63,6 +64,16 @@ public:
 
 std::unique_ptr<RendererBackend> make_cuda_renderer() {
   return std::make_unique<CudaRenderer>();
+}
+
+bool cuda_backend_available() {
+  int device_count = 0;
+  const cudaError_t error = cudaGetDeviceCount(&device_count);
+  if (error != cudaSuccess) {
+    cudaGetLastError();
+    return false;
+  }
+  return device_count > 0;
 }
 
 } // namespace raypalette
