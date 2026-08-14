@@ -59,6 +59,8 @@ set(RAYPALETTE_FORMAT_FILES
     ${PROJECT_SOURCE_DIR}/src/render/scene.hpp
     ${PROJECT_SOURCE_DIR}/src/ui/hsv_plot.cpp
     ${PROJECT_SOURCE_DIR}/src/ui/hsv_plot.hpp
+    ${PROJECT_SOURCE_DIR}/src/ui/texture.cpp
+    ${PROJECT_SOURCE_DIR}/src/ui/texture.hpp
     ${PROJECT_SOURCE_DIR}/tests/cpu/renderer_test.cpp
     ${PROJECT_SOURCE_DIR}/tests/unit/color_test.cpp
     ${PROJECT_SOURCE_DIR}/tests/unit/geometry_test.cpp
@@ -149,6 +151,7 @@ if(RAYPALETTE_BUILD_GUI)
     add_executable(raypalette_gui
         src/app/application.cpp
         src/ui/hsv_plot.cpp
+        src/ui/texture.cpp
     )
     target_include_directories(raypalette_gui PRIVATE ${PROJECT_SOURCE_DIR}/src)
     target_link_libraries(raypalette_gui PRIVATE

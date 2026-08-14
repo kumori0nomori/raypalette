@@ -1,6 +1,7 @@
 #include "math/color.hpp"
 #include "render/renderer.hpp"
 #include "ui/hsv_plot.hpp"
+#include "ui/texture.hpp"
 
 #include <GLFW/glfw3.h>
 
@@ -32,11 +33,6 @@ struct GuiLayout {
 };
 
 constexpr GuiLayout kDefaultGuiLayout{};
-
-struct DisplaySettings {
-  float exposure_ev = 0.0f;
-  bool use_reinhard = true;
-};
 
 struct PaletteColor {
   raypalette::Vec3 color;
@@ -70,49 +66,6 @@ std::string color_to_hex(const raypalette::Vec3& color) {
 bool same_palette_color(const raypalette::Vec3& left, const raypalette::Vec3& right) {
   return color_to_hex(left) == color_to_hex(right);
 }
-
-struct Texture {
-  GLuint id = 0;
-  int width = 0;
-  int height = 0;
-  std::vector<raypalette::Vec3> display_pixels;
-
-  void create(int new_width, int new_height) {
-    width = new_width;
-    height = new_height;
-    if (id == 0) {
-      glGenTextures(1, &id);
-    }
-    glBindTexture(GL_TEXTURE_2D, id);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, width, height, 0, GL_RGB, GL_FLOAT, nullptr);
-  }
-
-  void upload(const raypalette::Image& image, const DisplaySettings& display_settings) {
-    if (image.width != width || image.height != height) {
-      create(image.width, image.height);
-    }
-    // Convert linear color to sRGB for display.
-    display_pixels.resize(image.pixels.size());
-    for (std::size_t index = 0; index < image.pixels.size(); ++index) {
-      display_pixels[index] = raypalette::prepare_for_display(
-          image.pixels[index], display_settings.exposure_ev, display_settings.use_reinhard);
-    }
-    glBindTexture(GL_TEXTURE_2D, id);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image.width, image.height, GL_RGB, GL_FLOAT,
-                    display_pixels.data());
-  }
-
-  void destroy() {
-    if (id != 0) {
-      glDeleteTextures(1, &id);
-      id = 0;
-    }
-  }
-};
 
 raypalette::Vec3& light_color(raypalette::Light& light) {
   switch (light.type) {
@@ -169,7 +122,7 @@ raypalette::Vec3 sphere_material_color(const raypalette::Material& material) {
   return material.base_color;
 }
 
-std::vector<HsvPlotPoint> make_sphere_hsv_points(const Texture& texture,
+std::vector<HsvPlotPoint> make_sphere_hsv_points(const raypalette::ui::Texture& texture,
                                                  const raypalette::Scene& scene,
                                                  const raypalette::Camera& camera,
                                                  const raypalette::RenderSettings& settings) {
@@ -651,11 +604,11 @@ int main() {
                                       /*light_samples_per_frame=*/4,
                                       /*target_samples_per_pixel=*/64,
                                       /*max_bounces=*/8};
-  DisplaySettings display_settings;
+  raypalette::ui::DisplaySettings display_settings;
   float camera_distance = 5.0f;
   raypalette::Camera camera = raypalette::make_default_camera(1.0f, camera_distance);
   raypalette::Renderer renderer;
-  Texture texture;
+  raypalette::ui::Texture texture;
   raypalette::Image image;
   std::vector<PaletteColor> palette;
   std::vector<HsvPlotPoint> sphere_hsv_points;
