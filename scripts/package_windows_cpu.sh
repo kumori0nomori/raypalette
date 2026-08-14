@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd -- "$script_dir/.." && pwd)"
+cd "$repo_root"
+
 preset="windows-cpu-release"
 build_dir="build/windows-cpu-release"
 source_exe="$build_dir/Release/raypalette.exe"

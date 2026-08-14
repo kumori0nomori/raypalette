@@ -90,7 +90,16 @@ CPU版のRelease配布exeを作成する場合は、Git Bashから次を実行�
 インストールは不要です。Windows標準のOpenGL・Win32 DLLは使用します。
 
 ```sh
-bash package_windows_cpu.sh
+bash scripts/package_windows_cpu.sh
+```
+
+GPU版のRelease配布exeは、CUDA Toolkitと対応GPUがある環境で次を実行します。ビルドと
+CTestが成功した後、`dist/windows-gpu-release/raypalette.exe`へコピーされます。MSVC
+ランタイムとCUDA runtimeは静的リンクされるため、別途DLLを同梱する必要はありません。
+利用者側にはRTX 50シリーズ対応のNVIDIAドライバが必要です。
+
+```sh
+bash scripts/package_windows_gpu.sh
 ```
 
 整形チェックを行う場合、Visual Studio InstallerでLLVM toolsを追加するか、LLVM公式

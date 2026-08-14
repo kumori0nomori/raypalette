@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-build_type="${1:-debug}"
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd -- "$script_dir/.." && pwd)"
+cd "$repo_root"
+
+build_type="${1:-release}"
 
 case "$build_type" in
 	debug|release) ;;
