@@ -55,7 +55,7 @@ int main() {
   const GuiLayout& layout = kDefaultGuiLayout;
   GLFWwindow* window =
       glfwCreateWindow(static_cast<int>(layout.main_window.width),
-                       static_cast<int>(layout.main_window.height), "RayPalette", nullptr, nullptr);
+                       static_cast<int>(layout.main_window.height), "raypalette", nullptr, nullptr);
   if (window == nullptr) {
     glfwTerminate();
     return 1;

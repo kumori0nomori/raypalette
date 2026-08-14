@@ -1,6 +1,6 @@
-# RayPalette
+# raypalette
 
-RayPalette は、制御した照明下でイラストの色がどのように変化するかを
+raypalette は、制御した照明下でイラストの色がどのように変化するかを
 検討するための軽量な CUDA レンダラーです。
 シンプルな球と床のシーンの材質設定をGUIで対話的に調整できます。
 
@@ -168,7 +168,7 @@ Dear ImGui、GLFW、GoogleTest は、CMake の `FetchContent` を通じて
 
 ## 6. 実行結果
 
-左の`RayPalette Controls`画面でシーンの設定を行うと、その結果は逐次右の`Preview`画面へと反映されます。
+左の`raypalette Controls`画面でシーンの設定を行うと、その結果は逐次右の`Preview`画面へと反映されます。
 また`Preview`画面でマウスをクリックするとその下側の`Palette`タブにそのuv位置の色を追加します。
 `Palette`に追加された各色のHEXコードを選択して`Ctrl+C`を行うことで貼り付けすることが可能です。
 この`Palette`上の色はシーンの設定を変えるたびにリセットされます。

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(RayPalette
+project(raypalette
     VERSION 0.1.0
     DESCRIPTION "A lightweight CUDA renderer for illustration color studies"
     LANGUAGES CXX
@@ -32,12 +32,12 @@ if(RAYPALETTE_ENABLE_CUDA)
 
     if(CMAKE_CUDA_COMPILER_VERSION VERSION_LESS 12.8)
         message(FATAL_ERROR
-            "RayPalette requires CUDA Toolkit 12.8 or newer for RTX 50 series (sm_120). "
+            "raypalette requires CUDA Toolkit 12.8 or newer for RTX 50 series (sm_120). "
             "Detected CUDA ${CMAKE_CUDA_COMPILER_VERSION}.")
     endif()
 
     set(CMAKE_CUDA_ARCHITECTURES 120-real CACHE STRING
-        "RayPalette supports RTX 50 series GPUs (sm_120) only." FORCE)
+        "raypalette supports RTX 50 series GPUs (sm_120) only." FORCE)
 endif()
 
 option(RAYPALETTE_BUILD_GUI "Build the native GUI application" OFF)
@@ -197,7 +197,7 @@ if(RAYPALETTE_BUILD_GUI)
 endif()
 
 if(RAYPALETTE_ENABLE_CUDA)
-    message(STATUS "RayPalette CUDA target architecture: sm_${CMAKE_CUDA_ARCHITECTURES}")
+    message(STATUS "raypalette CUDA target architecture: sm_${CMAKE_CUDA_ARCHITECTURES}")
 else()
-    message(STATUS "RayPalette renderer backend: CPU")
+    message(STATUS "raypalette renderer backend: CPU")
 endif()
