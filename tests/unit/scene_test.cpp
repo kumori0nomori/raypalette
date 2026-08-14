@@ -1,4 +1,5 @@
 #include "render/bsdf.hpp"
+#include "render/light_sampling.hpp"
 #include "render/scene.hpp"
 
 #include <gtest/gtest.h>

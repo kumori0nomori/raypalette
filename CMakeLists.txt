@@ -53,6 +53,7 @@ set(RAYPALETTE_FORMAT_FILES
     ${PROJECT_SOURCE_DIR}/src/render/geometry.hpp
     ${PROJECT_SOURCE_DIR}/src/render/image.hpp
     ${PROJECT_SOURCE_DIR}/src/render/light.hpp
+    ${PROJECT_SOURCE_DIR}/src/render/light_sampling.hpp
     ${PROJECT_SOURCE_DIR}/src/render/material.hpp
     ${PROJECT_SOURCE_DIR}/src/render/ray.hpp
     ${PROJECT_SOURCE_DIR}/src/render/renderer_cpu.cpp

@@ -3,6 +3,7 @@
 #include "render/bsdf.hpp"
 #include "render/geometry.hpp"
 #include "render/light.hpp"
+#include "render/light_sampling.hpp"
 #include "render/material.hpp"
 #include "render/scene.hpp"
 
