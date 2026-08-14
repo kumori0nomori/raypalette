@@ -108,7 +108,7 @@ void draw_controls(ControlsContext& context) {
   };
 
   ImGui::SetNextWindowSize(ImVec2(360.0f, 750.0f), ImGuiCond_FirstUseEver);
-  ImGui::Begin("RayPalette Controls");
+  ImGui::Begin("Raypalette Controls");
   if (ImGui::Button("Reset scene")) {
     context.scene = make_default_scene();
     context.light_polar = {4.0f, 35.0f, 45.0f};

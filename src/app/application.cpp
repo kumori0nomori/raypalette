@@ -25,8 +25,16 @@ struct WindowSize {
   float height;
 };
 
+struct WindowPosition {
+  float x;
+  float y;
+};
+
 struct GuiLayout {
-  WindowSize main_window{1100.0f, 760.0f};
+  WindowSize main_window{1460.0f, 800.0f};
+  WindowPosition controls_panel_position{0.0f, 0.0f};
+  WindowPosition preview_panel_position{360.0f, 0.0f};
+  WindowPosition hsv_space_panel_position{960.0f, 0.0f};
   WindowSize controls_panel{360.0f, 750.0f};
   WindowSize preview_panel{600.0f, 750.0f};
   WindowSize hsv_space_panel{480.0f, 750.0f};
@@ -47,7 +55,7 @@ int main() {
   const GuiLayout& layout = kDefaultGuiLayout;
   GLFWwindow* window =
       glfwCreateWindow(static_cast<int>(layout.main_window.width),
-                       static_cast<int>(layout.main_window.height), "RayPalette", nullptr, nullptr);
+                       static_cast<int>(layout.main_window.height), "raypalette", nullptr, nullptr);
   if (window == nullptr) {
     glfwTerminate();
     return 1;
@@ -99,6 +107,9 @@ int main() {
     raypalette::ui::ControlsContext controls_context{
         scene,           light_polar, light_type_index, settings,      camera,
         camera_distance, renderer,    gui_state,        clear_palette, request_render};
+    ImGui::SetNextWindowPos(
+        ImVec2(layout.controls_panel_position.x, layout.controls_panel_position.y),
+        ImGuiCond_FirstUseEver);
     raypalette::ui::draw_controls(controls_context);
 
     if (gui_state.needs_render) {
@@ -115,8 +126,14 @@ int main() {
 
     raypalette::ui::PreviewContext preview_context{
         image, texture, gui_state, {layout.preview_panel.width, layout.preview_panel.height}};
+    ImGui::SetNextWindowPos(
+        ImVec2(layout.preview_panel_position.x, layout.preview_panel_position.y),
+        ImGuiCond_FirstUseEver);
     raypalette::ui::draw_preview(preview_context);
 
+    ImGui::SetNextWindowPos(
+        ImVec2(layout.hsv_space_panel_position.x, layout.hsv_space_panel_position.y),
+        ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(layout.hsv_space_panel.width, layout.hsv_space_panel.height),
                              ImGuiCond_FirstUseEver);
     ImGui::Begin("HSV Space");
