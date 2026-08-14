@@ -61,6 +61,8 @@ set(RAYPALETTE_FORMAT_FILES
     ${PROJECT_SOURCE_DIR}/src/ui/hsv_plot.hpp
     ${PROJECT_SOURCE_DIR}/src/ui/hsv_plot_gui.cpp
     ${PROJECT_SOURCE_DIR}/src/ui/hsv_plot_gui.hpp
+    ${PROJECT_SOURCE_DIR}/src/ui/controls.cpp
+    ${PROJECT_SOURCE_DIR}/src/ui/controls.hpp
     ${PROJECT_SOURCE_DIR}/src/ui/palette.cpp
     ${PROJECT_SOURCE_DIR}/src/ui/palette.hpp
     ${PROJECT_SOURCE_DIR}/src/ui/texture.cpp
@@ -157,6 +159,7 @@ if(RAYPALETTE_BUILD_GUI)
         src/app/application.cpp
         src/ui/hsv_plot.cpp
         src/ui/hsv_plot_gui.cpp
+        src/ui/controls.cpp
         src/ui/palette.cpp
         src/ui/texture.cpp
     )
