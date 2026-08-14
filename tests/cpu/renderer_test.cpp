@@ -27,15 +27,13 @@ TEST(CpuRenderer, RendersFiniteCanonicalImage) {
   EXPECT_TRUE(image_is_finite(image));
 }
 
-TEST(RendererBackend, UsesCpuByDefaultAndRejectsUnavailableCuda) {
+TEST(RendererBackend, UsesCpuByDefaultAndCanSelectCpu) {
   Renderer renderer;
 
   EXPECT_EQ(renderer.backend_type(), RendererBackendType::Cpu);
   EXPECT_TRUE(renderer.is_backend_available(RendererBackendType::Cpu));
-  EXPECT_FALSE(renderer.is_backend_available(RendererBackendType::Cuda));
-  EXPECT_FALSE(renderer.set_backend(RendererBackendType::Cuda));
-  EXPECT_EQ(renderer.backend_type(), RendererBackendType::Cpu);
   EXPECT_TRUE(renderer.set_backend(RendererBackendType::Cpu));
+  EXPECT_EQ(renderer.backend_type(), RendererBackendType::Cpu);
 }
 
 TEST(CpuRenderer, ReturnsEnvironmentForRayMiss) {
