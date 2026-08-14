@@ -45,5 +45,8 @@ void draw_hsv_space(const std::vector<HsvPlotPoint>& points, const Vec3& sphere_
                     const Vec3& light_color, float light_energy, float light_energy_maximum,
                     HsvHueSection& section, const std::vector<PaletteColor>& palette,
                     int selected_palette_index, HsvPlotView& view);
+void draw_hsv_hue_section(const std::vector<HsvPlotPoint>& points, HsvHueSection& section,
+                          const Vec3& sphere_color, const Vec3& light_color,
+                          const std::vector<PaletteColor>& palette, int selected_palette_index);
 
 } // namespace raypalette::ui

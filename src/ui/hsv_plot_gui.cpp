@@ -251,4 +251,106 @@ void draw_hsv_space(const std::vector<HsvPlotPoint>& points, const Vec3& sphere_
                      "Base color circle: V = 1");
 }
 
+void draw_hsv_hue_section(const std::vector<HsvPlotPoint>& points, HsvHueSection& section,
+                          const Vec3& sphere_color, const Vec3& light_color,
+                          const std::vector<PaletteColor>& palette, int selected_palette_index) {
+  ImGui::Separator();
+  ImGui::Text("Hue section");
+  const float section_width = std::max(240.0f, std::min(420.0f, ImGui::GetContentRegionAvail().x));
+  ImGui::InvisibleButton("##hsv-section-hue", ImVec2(section_width, 18.0f),
+                         ImGuiButtonFlags_MouseButtonLeft);
+  const ImVec2 hue_bar_min = ImGui::GetItemRectMin();
+  const ImVec2 hue_bar_max = ImGui::GetItemRectMax();
+  if (ImGui::IsItemHovered() && ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+    section.hue =
+        std::clamp((ImGui::GetIO().MousePos.x - hue_bar_min.x) / section_width, 0.0f, 1.0f);
+  }
+  ImDrawList* draw_list = ImGui::GetWindowDrawList();
+  constexpr int kHueBarSegments = 48;
+  for (int segment = 0; segment < kHueBarSegments; ++segment) {
+    const float x0 = hue_bar_min.x + section_width * segment / kHueBarSegments;
+    const float x1 = hue_bar_min.x + section_width * (segment + 1) / kHueBarSegments;
+    draw_list->AddRectFilled(
+        ImVec2(x0, hue_bar_min.y), ImVec2(x1, hue_bar_max.y),
+        hsv_plot_color(hsv_to_srgb({static_cast<float>(segment) / kHueBarSegments, 1.0f, 1.0f})));
+  }
+  const float hue_marker_x = hue_bar_min.x + section.hue * section_width;
+  draw_list->AddLine(ImVec2(hue_marker_x, hue_bar_min.y - 2.0f),
+                     ImVec2(hue_marker_x, hue_bar_max.y + 2.0f), ImGui::GetColorU32(ImGuiCol_Text),
+                     2.0f);
+
+  constexpr int kSaturationSteps = 48;
+  constexpr int kValueSteps = 32;
+  const float section_height = section_width * 0.52f;
+  ImGui::InvisibleButton("##hsv-section-plane", ImVec2(section_width, section_height));
+  const ImVec2 plane_min = ImGui::GetItemRectMin();
+  const ImVec2 plane_max = ImGui::GetItemRectMax();
+  for (int value_step = 0; value_step < kValueSteps; ++value_step) {
+    const float value = 1.0f - (static_cast<float>(value_step) + 0.5f) / kValueSteps;
+    for (int saturation_step = 0; saturation_step < kSaturationSteps; ++saturation_step) {
+      const float saturation = (static_cast<float>(saturation_step) + 0.5f) / kSaturationSteps;
+      const ImVec2 minimum(plane_min.x + section_width * saturation_step / kSaturationSteps,
+                           plane_min.y + section_height * value_step / kValueSteps);
+      const ImVec2 maximum(plane_min.x + section_width * (saturation_step + 1) / kSaturationSteps,
+                           plane_min.y + section_height * (value_step + 1) / kValueSteps);
+      draw_list->AddRectFilled(minimum, maximum,
+                               hsv_plot_color(hsv_to_srgb({section.hue, saturation, value})));
+    }
+  }
+  draw_list->AddRect(plane_min, plane_max, ImGui::GetColorU32(ImGuiCol_Border));
+  for (const HsvPlotPoint& point : points) {
+    if (hue_distance(point.hsv.hue, section.hue) > section.half_width)
+      continue;
+    const ImVec2 position(plane_min.x + point.hsv.saturation * section_width,
+                          plane_max.y - point.hsv.value * section_height);
+    draw_list->AddCircleFilled(position, 3.0f, hsv_plot_color(point.display_color));
+    draw_list->AddCircle(position, 3.0f, ImGui::GetColorU32(ImGuiCol_Text), 12, 1.0f);
+  }
+  const auto draw_marker = [&](const char* label, const Vec3& color, bool diamond, float radius) {
+    const Hsv hsv = srgb_to_hsv(color);
+    if (hue_distance(hsv.hue, section.hue) > section.half_width)
+      return;
+    const ImVec2 position(plane_min.x + hsv.saturation * section_width,
+                          plane_max.y - hsv.value * section_height);
+    const ImU32 outline = ImGui::GetColorU32(ImGuiCol_Text);
+    if (diamond) {
+      draw_list->AddQuadFilled(ImVec2(position.x, position.y - radius),
+                               ImVec2(position.x + radius, position.y),
+                               ImVec2(position.x, position.y + radius),
+                               ImVec2(position.x - radius, position.y), hsv_plot_color(color));
+      draw_list->AddQuad(ImVec2(position.x, position.y - radius),
+                         ImVec2(position.x + radius, position.y),
+                         ImVec2(position.x, position.y + radius),
+                         ImVec2(position.x - radius, position.y), outline, 1.5f);
+    } else {
+      draw_list->AddCircleFilled(position, radius, hsv_plot_color(color));
+      draw_list->AddCircle(position, radius, outline, 16, 1.5f);
+    }
+    draw_list->AddText(ImVec2(position.x + radius + 3.0f, position.y - 7.0f), outline, label);
+  };
+  draw_marker("Sphere", sphere_color, true, 7.0f);
+  draw_marker("Light", light_color, false, 6.0f);
+  for (int index = 0; index < static_cast<int>(palette.size()); ++index) {
+    const Hsv hsv = srgb_to_hsv(palette[index].color);
+    if (hue_distance(hsv.hue, section.hue) > section.half_width)
+      continue;
+    const ImVec2 position(plane_min.x + hsv.saturation * section_width,
+                          plane_max.y - hsv.value * section_height);
+    const float radius = selected_palette_index == index ? 6.0f : 4.0f;
+    const ImU32 outline = ImGui::GetColorU32(ImGuiCol_Text);
+    draw_list->AddRectFilled(ImVec2(position.x - radius, position.y - radius),
+                             ImVec2(position.x + radius, position.y + radius),
+                             hsv_plot_color(palette[index].color));
+    draw_list->AddRect(ImVec2(position.x - radius, position.y - radius),
+                       ImVec2(position.x + radius, position.y + radius), outline, 0.0f, 0, 1.5f);
+    const std::string label = "P" + std::to_string(index);
+    draw_list->AddText(ImVec2(position.x + radius + 3.0f, position.y - 7.0f), outline,
+                       label.c_str());
+  }
+  draw_list->AddText(ImVec2(plane_min.x + 5.0f, plane_min.y + 5.0f),
+                     ImGui::GetColorU32(ImGuiCol_TextDisabled), "V");
+  draw_list->AddText(ImVec2(plane_max.x - 12.0f, plane_max.y - 20.0f),
+                     ImGui::GetColorU32(ImGuiCol_TextDisabled), "S");
+}
+
 } // namespace raypalette::ui
