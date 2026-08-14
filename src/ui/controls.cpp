@@ -178,8 +178,10 @@ void draw_controls(ControlsContext& context) {
         context.request_render();
       }
     } else if (sphere_material.type == MaterialType::Emissive) {
-      if (ImGui::ColorEdit3("Emission color", &sphere_material.emission_color.x,
-                            ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs)) {
+      const bool emission_color_changed =
+          ImGui::ColorEdit3("Emission color", &sphere_material.emission_color.x,
+                            ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
+      if (emission_color_changed) {
         sphere_material.emission_color.x = std::max(0.0f, sphere_material.emission_color.x);
         sphere_material.emission_color.y = std::max(0.0f, sphere_material.emission_color.y);
         sphere_material.emission_color.z = std::max(0.0f, sphere_material.emission_color.z);
