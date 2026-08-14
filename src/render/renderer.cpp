@@ -47,8 +47,8 @@ Image Renderer::render(const Scene& scene, const Camera& camera, const RenderSet
     return Image{settings.width, settings.height, accumulated_pixels_};
   }
 
-  const Image frame = backend_->render_frame(scene, camera, settings, accumulated_samples_,
-                                               samples_this_frame);
+  const Image frame =
+      backend_->render_frame(scene, camera, settings, accumulated_samples_, samples_this_frame);
   const int old_sample_count = accumulated_samples_;
   const int new_sample_count = old_sample_count + samples_this_frame;
   for (std::size_t index = 0; index < pixel_count; ++index) {

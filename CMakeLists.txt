@@ -56,6 +56,7 @@ set(RAYPALETTE_FORMAT_FILES
     ${PROJECT_SOURCE_DIR}/src/render/light_sampling.hpp
     ${PROJECT_SOURCE_DIR}/src/render/material.hpp
     ${PROJECT_SOURCE_DIR}/src/render/ray.hpp
+    ${PROJECT_SOURCE_DIR}/src/render/renderer.cpp
     ${PROJECT_SOURCE_DIR}/src/render/renderer_cpu.cpp
     ${PROJECT_SOURCE_DIR}/src/render/renderer_cuda.cu
     ${PROJECT_SOURCE_DIR}/src/render/renderer.hpp
@@ -84,7 +85,18 @@ set(RAYPALETTE_FORMAT_FILES
     ${PROJECT_SOURCE_DIR}/tests/unit/vec3_test.cpp
 )
 
-find_program(RAYPALETTE_CLANG_FORMAT clang-format)
+if(WIN32)
+    find_program(RAYPALETTE_CLANG_FORMAT
+        NAMES clang-format clang-format.exe
+        HINTS
+            "$ENV{ProgramFiles}/LLVM/bin"
+            "$ENV{ProgramFiles}/Microsoft Visual Studio/2022/Community/VC/Tools/Llvm/x64/bin"
+            "$ENV{ProgramFiles}/Microsoft Visual Studio/2022/BuildTools/VC/Tools/Llvm/x64/bin"
+            "$ENV{ProgramFiles}/Microsoft Visual Studio/18/Community/VC/Tools/Llvm/x64/bin"
+    )
+else()
+    find_program(RAYPALETTE_CLANG_FORMAT NAMES clang-format)
+endif()
 if(RAYPALETTE_CLANG_FORMAT)
     add_custom_target(format
         COMMAND ${RAYPALETTE_CLANG_FORMAT} -i ${RAYPALETTE_FORMAT_FILES}

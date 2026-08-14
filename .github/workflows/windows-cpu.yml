@@ -15,6 +15,12 @@ jobs:
       - name: Set up MSVC development environment
         uses: ilammy/msvc-dev-cmd@v1
 
+      - name: Install clang-format
+        shell: pwsh
+        run: |
+          choco install llvm --no-progress --yes
+          "C:\Program Files\LLVM\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
       - name: Configure CPU GUI build
         run: >-
           cmake -S . -B build/windows-ci
@@ -24,6 +30,9 @@ jobs:
           -DRAYPALETTE_ENABLE_CUDA=OFF
           -DRAYPALETTE_BUILD_GUI=ON
           -DRAYPALETTE_FETCH_DEPENDENCIES=ON
+
+      - name: Check formatting
+        run: cmake --build build/windows-ci --target format-check
 
       - name: Build
         run: cmake --build build/windows-ci --parallel
