@@ -1,20 +1,4 @@
 #
-# library
-#
-
-# GPU
-cmake --preset linux-debug
-cmake --build --preset linux-debug --target format
-cmake --build --preset linux-debug
-ctest --preset linux-debug --output-on-failure
-
-# CPU
-cmake --preset linux-cpu-debug
-cmake --build --preset linux-cpu-debug --target format
-cmake --build --preset linux-cpu-debug
-ctest --preset linux-cpu-debug --output-on-failure
-
-#
 # GUI
 #
 

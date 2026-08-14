@@ -41,22 +41,8 @@ sudo apt install clang-format
 
 ### 2.1. Ubuntu 24.04（確認済み）
 
-- 次のコマンドで構成、ビルド、テストを実行できます。
-
-```sh
-# GPU
-cmake --preset linux-debug
-cmake --build --preset linux-debug
-ctest --preset linux-debug --output-on-failure
-
-# CPU
-cmake --preset linux-cpu-debug
-cmake --build --preset linux-cpu-debug
-ctest --preset linux-cpu-debug --output-on-failure
-```
-
-- GUI をビルドする場合は、Ubuntu の X11/OpenGL 開発パッケージをインストールした
-うえで、GUI 用 preset を使用します。初回の構成では FetchContent による依存ライブラリ
+- UbuntuではGUI用presetを使用して構成、ビルド、テストを実行します。X11/OpenGL開発
+パッケージをインストールしてください。初回の構成ではFetchContentによる依存ライブラリ
 のダウンロードが発生します。
 
 ```sh
@@ -86,8 +72,8 @@ Ubuntuでは`clang-format`をインストールしてから、任意のビルド
 整形または整形チェックを実行します。C++とCUDAのソースが対象です。
 
 ```sh
-cmake --build build/linux-debug --target format        # 修正
-cmake --build build/linux-debug --target format-check  # 検査
+cmake --build build/linux-gui-debug --target format        # 修正
+cmake --build build/linux-gui-debug --target format-check  # 検査
 ```
 
 `format`はファイルを直接更新し、`format-check`は差分がある場合に失敗します。
@@ -102,14 +88,14 @@ cmake --build build/linux-debug --target format-check  # 検査
 ### 4.1. Ubuntu 24.04（確認済み）
 
 ```sh
-ctest --preset linux-debug --output-on-failure
 ctest --preset linux-gui-debug --output-on-failure
+ctest --preset linux-cpu-gui-debug --output-on-failure
 ```
 
 特定のテスト群だけを実行する場合は、`-R` に正規表現を指定します。
 
 ```sh
-ctest --preset linux-debug -R Vec3 --output-on-failure
+ctest --preset linux-cpu-gui-debug -R Vec3 --output-on-failure
 ```
 
 現在は、ベクトル・色・極座標のGoogleTest unit testとCPU Renderer testを実行します。
