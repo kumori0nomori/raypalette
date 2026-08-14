@@ -54,8 +54,10 @@ set(RAYPALETTE_FORMAT_FILES
     ${PROJECT_SOURCE_DIR}/src/render/light.hpp
     ${PROJECT_SOURCE_DIR}/src/render/material.hpp
     ${PROJECT_SOURCE_DIR}/src/render/ray.hpp
-    ${PROJECT_SOURCE_DIR}/src/render/renderer.cu
+    ${PROJECT_SOURCE_DIR}/src/render/renderer_cpu.cpp
+    ${PROJECT_SOURCE_DIR}/src/render/renderer_cuda.cu
     ${PROJECT_SOURCE_DIR}/src/render/renderer.hpp
+    ${PROJECT_SOURCE_DIR}/src/render/tracer.hpp
     ${PROJECT_SOURCE_DIR}/src/render/scene.hpp
     ${PROJECT_SOURCE_DIR}/src/ui/hsv_plot.cpp
     ${PROJECT_SOURCE_DIR}/src/ui/hsv_plot.hpp
@@ -109,13 +111,17 @@ else()
     )
 endif()
 
-add_library(raypalette_renderer STATIC src/render/renderer.cu)
+if(RAYPALETTE_ENABLE_CUDA)
+    set(RAYPALETTE_RENDERER_SOURCE src/render/renderer_cuda.cu)
+else()
+    set(RAYPALETTE_RENDERER_SOURCE src/render/renderer_cpu.cpp)
+endif()
+
+add_library(raypalette_renderer STATIC ${RAYPALETTE_RENDERER_SOURCE})
 target_include_directories(raypalette_renderer PUBLIC ${PROJECT_SOURCE_DIR}/src)
 
 if(RAYPALETTE_ENABLE_CUDA)
     target_compile_definitions(raypalette_renderer PRIVATE RAYPALETTE_CUDA_BACKEND=1)
-else()
-    set_source_files_properties(src/render/renderer.cu PROPERTIES LANGUAGE CXX)
 endif()
 
 if(BUILD_TESTING)
