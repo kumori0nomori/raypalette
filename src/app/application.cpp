@@ -1,6 +1,7 @@
 #include "math/color.hpp"
 #include "render/renderer.hpp"
 #include "ui/hsv_plot.hpp"
+#include "ui/palette.hpp"
 #include "ui/texture.hpp"
 
 #include <GLFW/glfw3.h>
@@ -34,13 +35,6 @@ struct GuiLayout {
 
 constexpr GuiLayout kDefaultGuiLayout{};
 
-struct PaletteColor {
-  raypalette::Vec3 color;
-  std::string hex;
-  float u = 0.0f;
-  float v = 0.0f;
-};
-
 struct HsvPlotPoint {
   raypalette::Vec3 display_color;
   raypalette::Hsv hsv;
@@ -51,21 +45,6 @@ struct HsvHueSection {
   float hue = 0.0f;
   static constexpr float half_width = 1.0f / 120.0f;
 };
-
-std::string color_to_hex(const raypalette::Vec3& color) {
-  const auto to_byte = [](float value) {
-    return static_cast<int>(std::round(std::clamp(value, 0.0f, 1.0f) * 255.0f));
-  };
-
-  char buffer[8];
-  std::snprintf(buffer, sizeof(buffer), "#%02X%02X%02X", to_byte(color.x), to_byte(color.y),
-                to_byte(color.z));
-  return buffer;
-}
-
-bool same_palette_color(const raypalette::Vec3& left, const raypalette::Vec3& right) {
-  return color_to_hex(left) == color_to_hex(right);
-}
 
 raypalette::Vec3& light_color(raypalette::Light& light) {
   switch (light.type) {
@@ -231,7 +210,7 @@ void draw_hsv_marker(const HsvPlotCanvas& canvas, const char* label, const raypa
 void draw_hsv_reference_markers(const HsvPlotCanvas& canvas, const raypalette::Vec3& sphere_color,
                                 const raypalette::Vec3& light_color_value, float light_energy_value,
                                 float light_energy_maximum,
-                                const std::vector<PaletteColor>& palette,
+                                const std::vector<raypalette::ui::PaletteColor>& palette,
                                 int selected_palette_index) {
   draw_hsv_marker(canvas, "Sphere", sphere_color, true, 7.0f);
   const float normalized_energy =
@@ -381,8 +360,8 @@ void draw_hsv_section_plane(const HsvPlotCanvas& canvas, const HsvHueSection& se
 void draw_hsv_space(const std::vector<HsvPlotPoint>& points, const raypalette::Vec3& sphere_color,
                     const raypalette::Vec3& light_color_value, float light_energy_value,
                     float light_energy_maximum, HsvHueSection& section,
-                    const std::vector<PaletteColor>& palette, int selected_palette_index,
-                    raypalette::ui::HsvPlotView& view) {
+                    const std::vector<raypalette::ui::PaletteColor>& palette,
+                    int selected_palette_index, raypalette::ui::HsvPlotView& view) {
   if (ImGui::Button("Reset HSV view")) {
     view = {};
   }
@@ -423,7 +402,8 @@ void draw_hsv_space(const std::vector<HsvPlotPoint>& points, const raypalette::V
 void draw_hsv_hue_section(const std::vector<HsvPlotPoint>& points, HsvHueSection& section,
                           const raypalette::Vec3& sphere_color,
                           const raypalette::Vec3& light_color_value,
-                          const std::vector<PaletteColor>& palette, int selected_palette_index) {
+                          const std::vector<raypalette::ui::PaletteColor>& palette,
+                          int selected_palette_index) {
   ImGui::Separator();
   ImGui::Text("Hue section");
   const float section_width = std::max(240.0f, std::min(420.0f, ImGui::GetContentRegionAvail().x));
@@ -610,7 +590,7 @@ int main() {
   raypalette::Renderer renderer;
   raypalette::ui::Texture texture;
   raypalette::Image image;
-  std::vector<PaletteColor> palette;
+  std::vector<raypalette::ui::PaletteColor> palette;
   std::vector<HsvPlotPoint> sphere_hsv_points;
   raypalette::ui::HsvPlotView hsv_plot_view;
   HsvHueSection hsv_hue_section;
@@ -920,13 +900,14 @@ int main() {
         if (pixel_x >= 0 && pixel_x < image.width && pixel_y >= 0 && pixel_y < image.height) {
           const raypalette::Vec3 picked_color =
               texture.display_pixels[pixel_y * image.width + pixel_x];
-          if (palette.size() < 16) {
+          if (palette.size() < raypalette::ui::kMaximumPaletteColors) {
             bool already_added = false;
-            for (const PaletteColor& entry : palette) {
-              already_added = already_added || same_palette_color(entry.color, picked_color);
+            for (const raypalette::ui::PaletteColor& entry : palette) {
+              already_added =
+                  already_added || raypalette::ui::same_palette_color(entry.color, picked_color);
             }
             if (!already_added) {
-              palette.push_back({picked_color, color_to_hex(picked_color), u, v});
+              palette.push_back({picked_color, raypalette::ui::color_to_hex(picked_color), u, v});
               selected_palette_index = static_cast<int>(palette.size()) - 1;
             }
           }
@@ -935,7 +916,7 @@ int main() {
 
       ImDrawList* draw_list = ImGui::GetWindowDrawList();
       for (int index = 0; index < static_cast<int>(palette.size()); ++index) {
-        const PaletteColor& entry = palette[index];
+        const raypalette::ui::PaletteColor& entry = palette[index];
         const ImVec2 pin_position(image_min.x + entry.u * (image_max.x - image_min.x),
                                   image_min.y + entry.v * (image_max.y - image_min.y));
         const bool selected = selected_palette_index == index;
@@ -956,7 +937,7 @@ int main() {
         }
         for (int index = 0; index < static_cast<int>(palette.size()); ++index) {
           ImGui::PushID(index);
-          const PaletteColor& entry = palette[index];
+          const raypalette::ui::PaletteColor& entry = palette[index];
           ImGui::Text("%d", index);
           ImGui::SameLine();
           const ImVec4 swatch(entry.color.x, entry.color.y, entry.color.z, 1.0f);
