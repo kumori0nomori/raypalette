@@ -68,8 +68,8 @@ Get-FileHash .\raypalette.exe -Algorithm SHA256
     | `Glass tint` | ガラスを通過する光の色です。 |
     | `Glass absorption density` | ガラス内部で光が吸収される強さです。 |
     | `Glass IOR` | 屈折率です。入射角とともに反射・屈折の割合を決定します。 |
-    | `Sphere emission` | 発光する光の色です。 |
-    | `Emission` | 発光の強さです。値が大きいほど明るくなり、周囲への照明も強くなります。 |
+    | `Emission color` | 発光する光の色です。 |
+    | `Emission strength` | 発光の強さです。値が大きいほど明るくなり、周囲への照明も強くなります。 |
 
     </details>
 
@@ -84,7 +84,7 @@ Get-FileHash .\raypalette.exe -Algorithm SHA256
     | 設定 | 説明 | 例 |
     |---|---|---|
     | `Point` | 小さな1点から周囲360°の全方向に向かって放射状に光を放つ光源。 | 電球、ろうそくの光、松明 |
-    | `Rectasngular area` | 面から一方向に向かって光を放つ光源。 | 蛍光灯、窓から差し込む部屋の明かり |
+    | `Rectangular area` | 面から一方向に向かって光を放つ光源。 | 蛍光灯、窓から差し込む部屋の明かり |
     | `Directional (sun)` | 平行光源。空間全体に対して完全に平行な光を均一に降らせる。 | 太陽光 |
 
 - `Environment color`と`Environment intensity`: シーン全体を包む環境光の設定です。これは光源が直接届かない面への間接的な明るさを示します。

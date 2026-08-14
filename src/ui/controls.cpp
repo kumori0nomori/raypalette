@@ -155,14 +155,14 @@ void draw_controls(ControlsContext& context) {
         context.request_render();
       }
     } else if (sphere_material.type == MaterialType::Emissive) {
-      if (ImGui::ColorEdit3("Sphere emission", &sphere_material.emission_color.x,
+      if (ImGui::ColorEdit3("Emission color", &sphere_material.emission_color.x,
                             ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs)) {
         sphere_material.emission_color.x = std::max(0.0f, sphere_material.emission_color.x);
         sphere_material.emission_color.y = std::max(0.0f, sphere_material.emission_color.y);
         sphere_material.emission_color.z = std::max(0.0f, sphere_material.emission_color.z);
         context.request_render();
       }
-    } else if (ImGui::ColorEdit3("Sphere color", &sphere_material.base_color.x,
+    } else if (ImGui::ColorEdit3("Color", &sphere_material.base_color.x,
                                  ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs)) {
       context.request_render();
     }
@@ -307,7 +307,7 @@ void draw_controls(ControlsContext& context) {
       }
     }
     ImGui::EndDisabled();
-    if (ImGui::SliderInt("Samples per pixel", &context.settings.samples_per_pixel, 1, 4)) {
+    if (ImGui::SliderInt("Samples per pixel", &context.settings.samples_per_pixel, 1, 16)) {
       context.request_render();
     }
     if (ImGui::SliderInt("Light samples", &context.settings.light_samples_per_frame, 1, 4)) {
