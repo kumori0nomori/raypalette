@@ -5,6 +5,7 @@
 #include "render/scene.hpp"
 
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace raypalette {
@@ -54,6 +55,7 @@ public:
   bool is_accumulation_complete(const RenderSettings& settings) const;
   bool set_backend(RendererBackendType backend_type);
   bool is_backend_available(RendererBackendType backend_type) const;
+  std::string backend_label(RendererBackendType backend_type) const;
   RendererBackendType backend_type() const;
 
 private:

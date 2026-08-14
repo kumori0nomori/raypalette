@@ -292,6 +292,7 @@ void draw_controls(ControlsContext& context) {
   if (ImGui::CollapsingHeader("Rendering", ImGuiTreeNodeFlags_DefaultOpen)) {
     const RendererBackendType current_backend = context.renderer.backend_type();
     const bool cuda_available = context.renderer.is_backend_available(RendererBackendType::Cuda);
+    const std::string gpu_label = context.renderer.backend_label(RendererBackendType::Cuda);
     if (ImGui::RadioButton("CPU##renderer_backend", current_backend == RendererBackendType::Cpu)) {
       if (context.renderer.set_backend(RendererBackendType::Cpu)) {
         context.request_render();
@@ -299,17 +300,13 @@ void draw_controls(ControlsContext& context) {
     }
     ImGui::SameLine();
     ImGui::BeginDisabled(!cuda_available);
-    if (ImGui::RadioButton("GPU (CUDA)##renderer_backend",
+    if (ImGui::RadioButton((gpu_label + "##renderer_backend").c_str(),
                            current_backend == RendererBackendType::Cuda)) {
       if (context.renderer.set_backend(RendererBackendType::Cuda)) {
         context.request_render();
       }
     }
     ImGui::EndDisabled();
-    if (!cuda_available) {
-      ImGui::TextDisabled("GPU unavailable");
-    }
-
     if (ImGui::SliderInt("Samples per pixel", &context.settings.samples_per_pixel, 1, 4)) {
       context.request_render();
     }

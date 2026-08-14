@@ -31,7 +31,13 @@ TEST(RendererBackend, UsesCpuByDefaultAndCanSelectCpu) {
   Renderer renderer;
 
   EXPECT_EQ(renderer.backend_type(), RendererBackendType::Cpu);
+  EXPECT_EQ(renderer.backend_label(RendererBackendType::Cpu), "CPU");
   EXPECT_TRUE(renderer.is_backend_available(RendererBackendType::Cpu));
+  if (renderer.is_backend_available(RendererBackendType::Cuda)) {
+    EXPECT_NE(renderer.backend_label(RendererBackendType::Cuda), "GPU (unavailable)");
+  } else {
+    EXPECT_EQ(renderer.backend_label(RendererBackendType::Cuda), "GPU (unavailable)");
+  }
   EXPECT_TRUE(renderer.set_backend(RendererBackendType::Cpu));
   EXPECT_EQ(renderer.backend_type(), RendererBackendType::Cpu);
 }

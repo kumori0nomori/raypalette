@@ -36,8 +36,8 @@ if(RAYPALETTE_ENABLE_CUDA)
             "Detected CUDA ${CMAKE_CUDA_COMPILER_VERSION}.")
     endif()
 
-    set(CMAKE_CUDA_ARCHITECTURES 120 CACHE STRING
-        "RayPalette supports RTX 50 series GPUs (sm_120) only.")
+    set(CMAKE_CUDA_ARCHITECTURES 120-real CACHE STRING
+        "RayPalette supports RTX 50 series GPUs (sm_120) only." FORCE)
 endif()
 
 option(RAYPALETTE_BUILD_GUI "Build the native GUI application" OFF)

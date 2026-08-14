@@ -8,6 +8,7 @@ namespace raypalette {
 
 #ifdef RAYPALETTE_CUDA_BACKEND
 bool cuda_backend_available();
+std::string cuda_backend_name();
 #endif
 
 Renderer::Renderer() : backend_(make_cpu_renderer()) {}
@@ -109,6 +110,18 @@ bool Renderer::is_backend_available(RendererBackendType backend_type) const {
   return cuda_backend_available();
 #else
   return false;
+#endif
+}
+
+std::string Renderer::backend_label(RendererBackendType backend_type) const {
+  if (backend_type == RendererBackendType::Cpu) {
+    return "CPU";
+  }
+#ifdef RAYPALETTE_CUDA_BACKEND
+  const std::string name = cuda_backend_name();
+  return name.empty() ? "GPU (unavailable)" : "GPU (" + name + ")";
+#else
+  return "GPU (unavailable)";
 #endif
 }
 

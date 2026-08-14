@@ -76,4 +76,19 @@ bool cuda_backend_available() {
   return device_count > 0;
 }
 
+std::string cuda_backend_name() {
+  int device_count = 0;
+  if (cudaGetDeviceCount(&device_count) != cudaSuccess || device_count <= 0) {
+    cudaGetLastError();
+    return {};
+  }
+
+  cudaDeviceProp properties{};
+  if (cudaGetDeviceProperties(&properties, 0) != cudaSuccess) {
+    cudaGetLastError();
+    return {};
+  }
+  return properties.name;
+}
+
 } // namespace raypalette
