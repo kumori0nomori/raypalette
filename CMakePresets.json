@@ -18,8 +18,8 @@
       }
     },
     {
-      "name": "linux-gui-debug",
-      "displayName": "Linux GUI Debug",
+      "name": "linux-debug",
+      "displayName": "Linux Debug",
       "inherits": "base",
       "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
@@ -30,8 +30,8 @@
       }
     },
     {
-      "name": "linux-cpu-gui-debug",
-      "displayName": "Linux CPU GUI Debug",
+      "name": "linux-cpu-debug",
+      "displayName": "Linux CPU Debug",
       "inherits": "base",
       "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
@@ -42,8 +42,8 @@
       }
     },
     {
-      "name": "linux-gui-release",
-      "displayName": "Linux GUI Release",
+      "name": "linux-release",
+      "displayName": "Linux Release",
       "inherits": "base",
       "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
@@ -54,8 +54,8 @@
       }
     },
     {
-      "name": "linux-cpu-gui-release",
-      "displayName": "Linux CPU GUI Release",
+      "name": "linux-cpu-release",
+      "displayName": "Linux CPU Release",
       "inherits": "base",
       "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
@@ -71,23 +71,17 @@
       "inherits": "base",
       "generator": "Visual Studio 17 2022",
       "architecture": "x64",
+      "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
+        "CMAKE_BUILD_TYPE": "Debug",
+        "RAYPALETTE_ENABLE_CUDA": "ON",
+        "RAYPALETTE_BUILD_GUI": "ON",
+        "RAYPALETTE_FETCH_DEPENDENCIES": "ON"
       },
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
         "rhs": "Windows"
-      }
-    },
-    {
-      "name": "windows-gui-debug",
-      "displayName": "Windows GUI Debug",
-      "inherits": "windows-debug",
-      "binaryDir": "${sourceDir}/build/${presetName}",
-      "cacheVariables": {
-        "RAYPALETTE_BUILD_GUI": "ON",
-        "RAYPALETTE_FETCH_DEPENDENCIES": "ON"
       }
     },
     {
@@ -96,45 +90,39 @@
       "inherits": "base",
       "generator": "Visual Studio 17 2022",
       "architecture": "x64",
+      "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
+        "CMAKE_BUILD_TYPE": "Release",
+        "RAYPALETTE_ENABLE_CUDA": "ON",
+        "RAYPALETTE_BUILD_GUI": "ON",
+        "RAYPALETTE_FETCH_DEPENDENCIES": "ON"
       },
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
         "rhs": "Windows"
       }
-    },
-    {
-      "name": "windows-gui-release",
-      "displayName": "Windows GUI Release",
-      "inherits": "windows-release",
-      "binaryDir": "${sourceDir}/build/${presetName}",
-      "cacheVariables": {
-        "RAYPALETTE_BUILD_GUI": "ON",
-        "RAYPALETTE_FETCH_DEPENDENCIES": "ON"
-      }
     }
   ],
   "buildPresets": [
     {
-      "name": "linux-gui-debug",
-      "configurePreset": "linux-gui-debug",
+      "name": "linux-debug",
+      "configurePreset": "linux-debug",
       "configuration": "Debug"
     },
     {
-      "name": "linux-cpu-gui-debug",
-      "configurePreset": "linux-cpu-gui-debug",
+      "name": "linux-cpu-debug",
+      "configurePreset": "linux-cpu-debug",
       "configuration": "Debug"
     },
     {
-      "name": "linux-gui-release",
-      "configurePreset": "linux-gui-release",
+      "name": "linux-release",
+      "configurePreset": "linux-release",
       "configuration": "Release"
     },
     {
-      "name": "linux-cpu-gui-release",
-      "configurePreset": "linux-cpu-gui-release",
+      "name": "linux-cpu-release",
+      "configurePreset": "linux-cpu-release",
       "configuration": "Release"
     },
     {
@@ -143,49 +131,39 @@
       "configuration": "Debug"
     },
     {
-      "name": "windows-gui-debug",
-      "configurePreset": "windows-gui-debug",
-      "configuration": "Debug"
-    },
-    {
       "name": "windows-release",
       "configurePreset": "windows-release",
-      "configuration": "Release"
-    },
-    {
-      "name": "windows-gui-release",
-      "configurePreset": "windows-gui-release",
       "configuration": "Release"
     }
   ],
   "testPresets": [
     {
-      "name": "linux-gui-debug",
-      "configurePreset": "linux-gui-debug",
+      "name": "linux-debug",
+      "configurePreset": "linux-debug",
       "configuration": "Debug",
       "output": {
         "outputOnFailure": true
       }
     },
     {
-      "name": "linux-cpu-gui-debug",
-      "configurePreset": "linux-cpu-gui-debug",
+      "name": "linux-cpu-debug",
+      "configurePreset": "linux-cpu-debug",
       "configuration": "Debug",
       "output": {
         "outputOnFailure": true
       }
     },
     {
-      "name": "linux-gui-release",
-      "configurePreset": "linux-gui-release",
+      "name": "linux-release",
+      "configurePreset": "linux-release",
       "configuration": "Release",
       "output": {
         "outputOnFailure": true
       }
     },
     {
-      "name": "linux-cpu-gui-release",
-      "configurePreset": "linux-cpu-gui-release",
+      "name": "linux-cpu-release",
+      "configurePreset": "linux-cpu-release",
       "configuration": "Release",
       "output": {
         "outputOnFailure": true
@@ -200,24 +178,8 @@
       }
     },
     {
-      "name": "windows-gui-debug",
-      "configurePreset": "windows-gui-debug",
-      "configuration": "Debug",
-      "output": {
-        "outputOnFailure": true
-      }
-    },
-    {
       "name": "windows-release",
       "configurePreset": "windows-release",
-      "configuration": "Release",
-      "output": {
-        "outputOnFailure": true
-      }
-    },
-    {
-      "name": "windows-gui-release",
-      "configurePreset": "windows-gui-release",
       "configuration": "Release",
       "output": {
         "outputOnFailure": true

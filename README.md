@@ -47,16 +47,16 @@ sudo apt install clang-format
 
 ```sh
 # GPU
-cmake --preset linux-gui-debug
-cmake --build --preset linux-gui-debug
-ctest --preset linux-gui-debug --output-on-failure
-./build/linux-gui-debug/raypalette_gui
+cmake --preset linux-debug
+cmake --build --preset linux-debug
+ctest --preset linux-debug --output-on-failure
+./build/linux-debug/raypalette_gui
 
 # CPU
-cmake --preset linux-cpu-gui-debug
-cmake --build --preset linux-cpu-gui-debug
-ctest --preset linux-cpu-gui-debug --output-on-failure
-./build/linux-cpu-gui-debug/raypalette_gui
+cmake --preset linux-cpu-debug
+cmake --build --preset linux-cpu-debug
+ctest --preset linux-cpu-debug --output-on-failure
+./build/linux-cpu-debug/raypalette_gui
 ```
 
 ### 2.2. Windows 11（未検証）
@@ -72,8 +72,8 @@ Ubuntuでは`clang-format`をインストールしてから、任意のビルド
 整形または整形チェックを実行します。C++とCUDAのソースが対象です。
 
 ```sh
-cmake --build build/linux-gui-debug --target format        # 修正
-cmake --build build/linux-gui-debug --target format-check  # 検査
+cmake --build build/linux-debug --target format        # 修正
+cmake --build build/linux-debug --target format-check  # 検査
 ```
 
 `format`はファイルを直接更新し、`format-check`は差分がある場合に失敗します。
@@ -88,14 +88,14 @@ cmake --build build/linux-gui-debug --target format-check  # 検査
 ### 4.1. Ubuntu 24.04（確認済み）
 
 ```sh
-ctest --preset linux-gui-debug --output-on-failure
-ctest --preset linux-cpu-gui-debug --output-on-failure
+ctest --preset linux-debug --output-on-failure
+ctest --preset linux-cpu-debug --output-on-failure
 ```
 
 特定のテスト群だけを実行する場合は、`-R` に正規表現を指定します。
 
 ```sh
-ctest --preset linux-cpu-gui-debug -R Vec3 --output-on-failure
+ctest --preset linux-cpu-debug -R Vec3 --output-on-failure
 ```
 
 現在は、ベクトル・色・極座標のGoogleTest unit testとCPU Renderer testを実行します。
