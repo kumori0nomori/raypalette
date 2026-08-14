@@ -1,5 +1,6 @@
 #include "math/color.hpp"
 #include "math/polar.hpp"
+#include "render/bsdf.hpp"
 #include "render/geometry.hpp"
 #include "render/light.hpp"
 #include "render/material.hpp"

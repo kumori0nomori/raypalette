@@ -1,3 +1,4 @@
+#include "render/bsdf.hpp"
 #include "render/scene.hpp"
 
 #include <gtest/gtest.h>

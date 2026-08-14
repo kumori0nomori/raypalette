@@ -49,6 +49,7 @@ set(RAYPALETTE_FORMAT_FILES
     ${PROJECT_SOURCE_DIR}/src/math/polar.hpp
     ${PROJECT_SOURCE_DIR}/src/math/vec3.hpp
     ${PROJECT_SOURCE_DIR}/src/render/camera.hpp
+    ${PROJECT_SOURCE_DIR}/src/render/bsdf.hpp
     ${PROJECT_SOURCE_DIR}/src/render/geometry.hpp
     ${PROJECT_SOURCE_DIR}/src/render/image.hpp
     ${PROJECT_SOURCE_DIR}/src/render/light.hpp

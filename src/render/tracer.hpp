@@ -1,5 +1,6 @@
 #pragma once
 
+#include "render/bsdf.hpp"
 #include "render/renderer.hpp"
 
 namespace raypalette {
