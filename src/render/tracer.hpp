@@ -178,6 +178,17 @@ RAYPALETTE_HOST_DEVICE inline float surface_sheen_factor(const Ray& ray, const H
   return material.sheen * powf(grazing, 5.0f);
 }
 
+RAYPALETTE_HOST_DEVICE inline float surface_subsurface_cosine(const HitRecord& record,
+                                                              const Material& material,
+                                                              const Vec3& direction) {
+  if (material.subsurface <= 0.0f) {
+    return 0.0f;
+  }
+  const float wrap = 0.5f * material.subsurface;
+  const float wrapped_cosine = (dot(record.normal, direction) + wrap) / fmaxf(1.0f, 1.0f + wrap);
+  return material.subsurface * fmaxf(0.0f, fminf(1.0f, wrapped_cosine));
+}
+
 RAYPALETTE_HOST_DEVICE inline float surface_specular_pdf(const Ray& ray, const HitRecord& record,
                                                          const Vec3& direction, float roughness) {
   const Vec3 view_direction = normalized(-ray.direction);
@@ -200,8 +211,12 @@ evaluate_surface_lighting(const Scene& scene, const Ray& ray, const HitRecord& r
     LightSample light_sample;
     if (!try_sample_light(scene, record, sample_index, light_sample_count, light_sample))
       continue;
-    const float cosine = fmaxf(0.0f, dot(record.normal, light_sample.direction_to_light));
-    if (cosine > 0.0f && visible_to_light(scene, record, light_sample, minimum_distance)) {
+    const float raw_cosine = dot(record.normal, light_sample.direction_to_light);
+    const float cosine = fmaxf(0.0f, raw_cosine);
+    const float subsurface_cosine =
+        surface_subsurface_cosine(record, material, light_sample.direction_to_light);
+    if ((cosine > 0.0f || subsurface_cosine > 0.0f) &&
+        visible_to_light(scene, record, light_sample, minimum_distance)) {
       const float diffuse_pdf = cosine / kPi;
       float specular_pdf = 0.0f;
       Vec3 specular_brdf;
@@ -224,8 +239,9 @@ evaluate_surface_lighting(const Scene& scene, const Ray& ray, const HitRecord& r
           light_sample.pdf <= 0.0f ? 1.0f : power_heuristic(light_sample.pdf, mixture_pdf);
       const float sheen_factor =
           surface_sheen_factor(ray, record, material, light_sample.direction_to_light);
-      direct_light += ((diffuse_weight + sheen_factor) * material.base_color + specular_brdf) *
-                      light_sample.radiance * cosine * mis_weight;
+      const Vec3 diffuse_brdf = material.base_color * (diffuse_weight * cosine +
+                                                       sheen_factor * cosine + subsurface_cosine);
+      direct_light += (diffuse_brdf + specular_brdf * cosine) * light_sample.radiance * mis_weight;
     }
   }
   if (scene.light.type == LightType::RectArea)
@@ -236,8 +252,12 @@ evaluate_surface_lighting(const Scene& scene, const Ray& ray, const HitRecord& r
     LightSample light_sample;
     if (!try_sample_emissive_sphere(scene, record, sample_index, random_value, light_sample))
       continue;
-    const float cosine = fmaxf(0.0f, dot(record.normal, light_sample.direction_to_light));
-    if (cosine > 0.0f && visible_to_light(scene, record, light_sample, minimum_distance)) {
+    const float raw_cosine = dot(record.normal, light_sample.direction_to_light);
+    const float cosine = fmaxf(0.0f, raw_cosine);
+    const float subsurface_cosine =
+        surface_subsurface_cosine(record, material, light_sample.direction_to_light);
+    if ((cosine > 0.0f || subsurface_cosine > 0.0f) &&
+        visible_to_light(scene, record, light_sample, minimum_distance)) {
       const float diffuse_pdf = cosine / kPi;
       float specular_pdf = 0.0f;
       Vec3 specular_brdf;
@@ -258,9 +278,10 @@ evaluate_surface_lighting(const Scene& scene, const Ray& ray, const HitRecord& r
       const float mis_weight = power_heuristic(light_sample.pdf, mixture_pdf);
       const float sheen_factor =
           surface_sheen_factor(ray, record, material, light_sample.direction_to_light);
+      const Vec3 diffuse_brdf = material.base_color * (diffuse_weight * cosine +
+                                                       sheen_factor * cosine + subsurface_cosine);
       emissive_direct_light +=
-          ((diffuse_weight + sheen_factor) * material.base_color + specular_brdf) *
-          light_sample.radiance * cosine * mis_weight;
+          (diffuse_brdf + specular_brdf * cosine) * light_sample.radiance * mis_weight;
     }
   }
   emissive_direct_light *= 1.0f / light_sample_count;
@@ -441,10 +462,12 @@ RAYPALETTE_HOST_DEVICE inline Vec3 trace_color(const Scene& scene, const Ray& ra
         const float mixture_pdf = surface_mixture_pdf(resolved_material, diffuse_pdf, specular_pdf);
         const float sheen_factor =
             surface_sheen_factor(current_ray, record, resolved_material, scattered_direction);
-        throughput =
-            throughput *
-            ((1.0f - resolved_material.metallic + sheen_factor) * resolved_material.base_color) /
-            fmaxf(1.0e-6f, diffuse_probability);
+        const float subsurface_factor =
+            surface_subsurface_cosine(record, resolved_material, scattered_direction);
+        throughput = throughput *
+                     ((1.0f - resolved_material.metallic + sheen_factor + subsurface_factor) *
+                      resolved_material.base_color) /
+                     fmaxf(1.0e-6f, diffuse_probability);
         previous_bsdf_pdf = mixture_pdf;
         previous_scatter_was_delta = false;
         current_ray = {record.position + minimum_distance * record.normal, scattered_direction};

@@ -127,7 +127,7 @@ resolverはプリセットの標準値と、`Material` に保存されたユー�
 | Skin | 0.0 | 0.45 | 0.0 | 0.0 | 0.35 | 0.0 |
 | Hair | 0.0 | 0.35 | 0.0 | 0.0 | 0.0 | 0.8 |
 
-`Skin`、`Hair` のローブが未実装の段階では、対応するパラメータを保持してもレンダリングへ影響させない。ClothのSheenはtangentを使わないgrazing-angle近似として実装し、本格的な布地モデルとは区別する。
+Hairのローブが未実装の段階では、対応するパラメータを保持してもレンダリングへ影響させない。ClothのSheenとSkinのSubsurfaceは、それぞれtangentを使わないgrazing-angle近似とwrapped diffuse近似として実装し、本格的な布地モデルやSSSとは区別する。
 
 ## 5. 散乱処理
 
@@ -189,7 +189,8 @@ Roughness
 - GlassではGlass tint、IOR、吸収密度を表示する
 - EmissiveではEmission color、Emission strengthを表示する
 - `Metallic` と `Specular` は `Material details` で表示する
-- 未実装のcoat、subsurface、anisotropyはGUIに表示しない
+- `Sheen` と `Subsurface` は `Material details` で表示する
+- 未実装のcoat、anisotropyはGUIに表示しない
 - プリセット選択時は色を保持し、材質特性の標準値を適用する
 - プリセット適用後にroughnessを変更しても、選択中のプリセット名は維持する
 - `Reset preset values` は必要になった時点で追加する
@@ -227,10 +228,10 @@ Hair、Skin、Clothをbackend実装前に表示する場合は、名前だけで
 ### Phase 4: Cloth、Skin
 
 - [x] Sheenを追加する
-- 簡易subsurface近似を追加する
+- [x] wrapped diffuseによる簡易subsurface近似を追加する
 - [x] Clothプリセットを有効化する
-- [ ] Skinプリセットを有効化する
-- [x] Sheenのdirect lighting、path sampling、有限値のテストを追加する
+- [x] Skinプリセットを有効化する
+- [x] Sheen/Subsurfaceのdirect lighting、path sampling、有限値のテストを追加する
 
 ### Phase 5: Hair / Anisotropic
 

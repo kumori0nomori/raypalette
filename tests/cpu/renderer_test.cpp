@@ -84,6 +84,23 @@ TEST(CpuRenderer, ClothSheenChangesDirectLighting) {
   EXPECT_GT(image_difference(matte, cloth), 1.0e-5f);
 }
 
+TEST(CpuRenderer, SkinSubsurfaceChangesDirectLighting) {
+  Scene matte_scene = make_default_scene();
+  apply_material_preset(matte_scene.materials[kSphereMaterialIndex], MaterialPreset::Matte);
+  matte_scene.materials[kSphereMaterialIndex].roughness = 0.45f;
+  Scene skin_scene = matte_scene;
+  apply_material_preset(skin_scene.materials[kSphereMaterialIndex], MaterialPreset::Skin);
+
+  const Camera camera = make_default_camera(1.0f);
+  const RenderSettings settings{16, 16, 0.001f, 1, 1};
+  Renderer matte_renderer;
+  Renderer skin_renderer;
+  const Image matte = matte_renderer.render(matte_scene, camera, settings);
+  const Image skin = skin_renderer.render(skin_scene, camera, settings);
+
+  EXPECT_GT(image_difference(matte, skin), 1.0e-5f);
+}
+
 TEST(CpuRenderer, SupportsSixteenAreaLightSamples) {
   Scene scene = make_default_scene();
   scene.light = make_rect_area_light({4.0f, 35.0f, 45.0f}, scene.sphere.center, {0.0f, -1.0f, 0.0f},
