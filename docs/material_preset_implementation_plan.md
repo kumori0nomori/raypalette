@@ -223,6 +223,7 @@ Hair、Skin、Clothをbackend実装前に表示する場合は、名前だけで
 - [x] 通常ライトとemissive sphereのSurface評価を共通helperへ抽出する
 - [x] Surfaceのローブ選択、sampling、throughput、delta状態更新を`SurfaceSample`へ抽出する
 - [x] Surfaceの数学評価と1サンプル評価を`surface.hpp`へ分離する
+- [x] MISのpower heuristicを共通BSDF数学APIへ統合する
 
 ### Phase 3: 基本プリセットとGUI
 

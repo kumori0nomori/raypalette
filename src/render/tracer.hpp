@@ -54,12 +54,6 @@ RAYPALETTE_HOST_DEVICE inline bool hit_scene(const Scene& scene, const Ray& ray,
   return hit_anything;
 }
 
-RAYPALETTE_HOST_DEVICE inline float power_heuristic(float first_pdf, float second_pdf) {
-  const float first_squared = first_pdf * first_pdf;
-  const float second_squared = second_pdf * second_pdf;
-  return first_squared / fmaxf(1.0e-12f, first_squared + second_squared);
-}
-
 RAYPALETTE_HOST_DEVICE inline Vec3 emitted_radiance(const Material& material) {
   if (material.type != MaterialType::Emissive) {
     return {};

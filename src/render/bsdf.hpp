@@ -7,6 +7,12 @@ namespace raypalette {
 
 constexpr float kPi = 3.14159265358979323846f;
 
+RAYPALETTE_HOST_DEVICE inline float power_heuristic(float first_pdf, float second_pdf) {
+  const float first_squared = first_pdf * first_pdf;
+  const float second_squared = second_pdf * second_pdf;
+  return first_squared / fmaxf(1.0e-12f, first_squared + second_squared);
+}
+
 //
 // Compute reflection and refraction directions used by Surface and Dielectric materials.
 // - Reflection: light reflects from a surface.

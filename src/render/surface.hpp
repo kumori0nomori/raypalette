@@ -70,12 +70,6 @@ RAYPALETTE_HOST_DEVICE inline float surface_specular_pdf(const Ray& ray, const H
                                         surface_effective_roughness(material), material.anisotropy);
 }
 
-RAYPALETTE_HOST_DEVICE inline float surface_power_heuristic(float first_pdf, float second_pdf) {
-  const float first_squared = first_pdf * first_pdf;
-  const float second_squared = second_pdf * second_pdf;
-  return first_squared / fmaxf(1.0e-12f, first_squared + second_squared);
-}
-
 RAYPALETTE_HOST_DEVICE inline Vec3
 evaluate_surface_light_sample(const Ray& ray, const HitRecord& record,
                              const PrincipledParameters& material,
@@ -111,7 +105,7 @@ evaluate_surface_light_sample(const Ray& ray, const HitRecord& record,
   const float mixture_pdf = surface_mixture_pdf(material, diffuse_pdf, specular_pdf);
   const float mis_weight = light_sample.pdf <= 0.0f
                                ? 1.0f
-                               : surface_power_heuristic(light_sample.pdf, mixture_pdf);
+                               : power_heuristic(light_sample.pdf, mixture_pdf);
   const float sheen_factor =
       surface_sheen_factor(ray, record, material, light_sample.direction_to_light);
   const float diffuse_weight = 1.0f - material.metallic;
