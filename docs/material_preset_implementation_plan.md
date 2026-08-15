@@ -243,6 +243,7 @@ Hair、Skin、Clothをbackend実装前に表示する場合は、名前だけで
 ### Phase 5: Hair / Anisotropic
 
 - [x] ジオメトリに接線情報を追加する
+- [x] stable tangent生成をGeometry helperへ整理する
 - [x] 接線付き異方性GGXをSurfaceローブとして採用する
 - [x] 異方性用のsampling/PDF/MISを追加する
 - [x] Hairプリセットを有効化する

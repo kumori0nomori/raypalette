@@ -21,6 +21,8 @@ TEST(SphereIntersection, ReturnsNearestFrontFaceHit) {
   EXPECT_FLOAT_EQ(record.normal.z, -1.0f);
   EXPECT_TRUE(record.front_face);
   EXPECT_EQ(record.material_index, 7U);
+  EXPECT_NEAR(length(record.tangent), 1.0f, 1.0e-6f);
+  EXPECT_NEAR(dot(record.normal, record.tangent), 0.0f, 1.0e-6f);
 }
 
 TEST(SphereIntersection, FlipsNormalForInsideHit) {
@@ -54,6 +56,21 @@ TEST(PlaneIntersection, ReturnsFloorHitAndMaterial) {
   EXPECT_NEAR(record.position.y, 0.0f, 1.0e-6f);
   EXPECT_FLOAT_EQ(record.normal.y, 1.0f);
   EXPECT_EQ(record.material_index, 3U);
+  EXPECT_NEAR(length(record.tangent), 1.0f, 1.0e-6f);
+  EXPECT_NEAR(dot(record.normal, record.tangent), 0.0f, 1.0e-6f);
+}
+
+TEST(Geometry, GeneratesStableOrthogonalTangent) {
+  const Vec3 normals[] = {{1.0f, 0.0f, 0.0f},
+                          {0.0f, 1.0f, 0.0f},
+                          {0.0f, 0.0f, 1.0f},
+                          normalized(Vec3{1.0f, 2.0f, 3.0f})};
+  for (const Vec3& normal : normals) {
+    const Vec3 tangent = stable_tangent(normal);
+    EXPECT_TRUE(is_finite(tangent));
+    EXPECT_NEAR(length(tangent), 1.0f, 1.0e-6f);
+    EXPECT_NEAR(dot(normal, tangent), 0.0f, 1.0e-6f);
+  }
 }
 
 TEST(PlaneIntersection, RejectsParallelRaysAndZeroNormal) {
