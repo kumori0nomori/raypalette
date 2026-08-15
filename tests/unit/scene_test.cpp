@@ -36,6 +36,67 @@ TEST(Material, ResolvesSurfacePresets) {
   EXPECT_FLOAT_EQ(cloth.coat_roughness, 0.0f);
 }
 
+TEST(Material, AppliesAllSurfacePresetValues) {
+  struct PresetExpectation {
+    MaterialPreset preset;
+    float metallic;
+    float roughness;
+    float coat;
+    float coat_roughness;
+    float sheen;
+    float subsurface;
+    float anisotropy;
+  };
+  const PresetExpectation expectations[] = {
+      {MaterialPreset::Matte, 0.0f, 0.85f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f},
+      {MaterialPreset::Glossy, 0.0f, 0.22f, 0.7f, 0.04f, 0.0f, 0.0f, 0.0f},
+      {MaterialPreset::Metal, 1.0f, 0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f},
+      {MaterialPreset::Cloth, 0.0f, 0.8f, 0.0f, 0.0f, 0.6f, 0.0f, 0.0f},
+      {MaterialPreset::Skin, 0.0f, 0.45f, 0.0f, 0.0f, 0.0f, 0.35f, 0.0f},
+      {MaterialPreset::Hair, 0.0f, 0.35f, 0.0f, 0.0f, 0.0f, 0.0f, 0.8f},
+  };
+
+  for (const PresetExpectation& expectation : expectations) {
+    Material material;
+    apply_material_preset(material, expectation.preset);
+    const PrincipledParameters parameters = resolve_principled_parameters(material);
+
+    EXPECT_EQ(material.type, MaterialType::Surface);
+    EXPECT_EQ(material.preset, expectation.preset);
+    EXPECT_FLOAT_EQ(parameters.metallic, expectation.metallic);
+    EXPECT_FLOAT_EQ(parameters.roughness, expectation.roughness);
+    EXPECT_FLOAT_EQ(parameters.coat, expectation.coat);
+    EXPECT_FLOAT_EQ(parameters.coat_roughness, expectation.coat_roughness);
+    EXPECT_FLOAT_EQ(parameters.sheen, expectation.sheen);
+    EXPECT_FLOAT_EQ(parameters.subsurface, expectation.subsurface);
+    EXPECT_FLOAT_EQ(parameters.anisotropy, expectation.anisotropy);
+  }
+}
+
+TEST(Material, CustomPresetPreservesManualSurfaceValues) {
+  Material material;
+  material.type = MaterialType::Dielectric;
+  material.metallic = 0.35f;
+  material.roughness = 0.23f;
+  material.coat = 0.4f;
+  material.coat_roughness = 0.12f;
+  material.sheen = 0.2f;
+  material.subsurface = 0.3f;
+  material.anisotropy = -0.4f;
+
+  apply_material_preset(material, MaterialPreset::Custom);
+  const PrincipledParameters parameters = resolve_principled_parameters(material);
+
+  EXPECT_EQ(material.type, MaterialType::Surface);
+  EXPECT_FLOAT_EQ(parameters.metallic, 0.35f);
+  EXPECT_FLOAT_EQ(parameters.roughness, 0.23f);
+  EXPECT_FLOAT_EQ(parameters.coat, 0.4f);
+  EXPECT_FLOAT_EQ(parameters.coat_roughness, 0.12f);
+  EXPECT_FLOAT_EQ(parameters.sheen, 0.2f);
+  EXPECT_FLOAT_EQ(parameters.subsurface, 0.3f);
+  EXPECT_FLOAT_EQ(parameters.anisotropy, -0.4f);
+}
+
 TEST(Material, UsesConsistentSurfaceMixturePdf) {
   Material surface;
   const float diffuse_pdf = 0.25f;
