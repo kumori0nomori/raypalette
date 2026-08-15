@@ -25,7 +25,9 @@ TEST(Material, ResolvesSurfacePresets) {
   apply_material_preset(material, MaterialPreset::Glossy);
   const PrincipledParameters glossy = resolve_principled_parameters(material);
   EXPECT_FLOAT_EQ(glossy.metallic, 0.0f);
-  EXPECT_FLOAT_EQ(glossy.roughness, 0.28f);
+  EXPECT_FLOAT_EQ(glossy.roughness, 0.22f);
+  EXPECT_FLOAT_EQ(glossy.coat, 0.7f);
+  EXPECT_FLOAT_EQ(glossy.coat_roughness, 0.04f);
 
   apply_material_preset(material, MaterialPreset::Cloth);
   const PrincipledParameters cloth = resolve_principled_parameters(material);

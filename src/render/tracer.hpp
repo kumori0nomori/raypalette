@@ -148,8 +148,14 @@ RAYPALETTE_HOST_DEVICE inline Vec3 cosine_sample_direction(const Vec3& normal, f
 RAYPALETTE_HOST_DEVICE inline Vec3 surface_specular_f0(const Material& material) {
   const float dielectric_f0 = 0.04f * material.specular;
   const Vec3 dielectric_reflectance{dielectric_f0, dielectric_f0, dielectric_f0};
-  return dielectric_reflectance * (1.0f - material.metallic) +
-         material.base_color * material.metallic;
+  const Vec3 base_f0 =
+      dielectric_reflectance * (1.0f - material.metallic) + material.base_color * material.metallic;
+  const Vec3 coat_f0{0.04f, 0.04f, 0.04f};
+  return base_f0 * (1.0f - material.coat) + coat_f0 * material.coat;
+}
+
+RAYPALETTE_HOST_DEVICE inline float surface_specular_roughness(const Material& material) {
+  return material.roughness * (1.0f - material.coat) + material.coat_roughness * material.coat;
 }
 
 RAYPALETTE_HOST_DEVICE inline float surface_specular_probability(const Material& material) {
@@ -195,7 +201,7 @@ RAYPALETTE_HOST_DEVICE inline float surface_specular_pdf(const Ray& ray, const H
   const Vec3 half_vector = normalized(view_direction + direction);
   const float v_dot_h = fmaxf(0.0f, dot(view_direction, half_vector));
   return ggx_anisotropic_reflection_pdf(record.normal, record.tangent, half_vector, v_dot_h,
-                                        material.roughness, material.anisotropy);
+                                        surface_specular_roughness(material), material.anisotropy);
 }
 
 RAYPALETTE_HOST_DEVICE inline Vec3
@@ -227,15 +233,16 @@ evaluate_surface_lighting(const Scene& scene, const Ray& ray, const HitRecord& r
       const float n_dot_h = fmaxf(0.0f, dot(record.normal, half_vector));
       const float v_dot_h = fmaxf(0.0f, dot(view_direction, half_vector));
       if (n_dot_v > 0.0f && n_dot_h > 0.0f && v_dot_h > 1.0e-6f) {
+        const float specular_roughness = surface_specular_roughness(material);
         const float distribution = ggx_anisotropic_distribution(
-            record.normal, record.tangent, half_vector, material.roughness, material.anisotropy);
-        const float geometry = ggx_geometry(n_dot_v, cosine, material.roughness);
+            record.normal, record.tangent, half_vector, specular_roughness, material.anisotropy);
+        const float geometry = ggx_geometry(n_dot_v, cosine, specular_roughness);
         const Vec3 fresnel = schlick_fresnel(specular_f0, v_dot_h);
         specular_brdf =
             fresnel * (distribution * geometry / fmaxf(1.0e-6f, 4.0f * n_dot_v * cosine));
         specular_pdf =
             ggx_anisotropic_reflection_pdf(record.normal, record.tangent, half_vector, v_dot_h,
-                                           material.roughness, material.anisotropy);
+                                           specular_roughness, material.anisotropy);
       }
       const float mixture_pdf = surface_mixture_pdf(material, diffuse_pdf, specular_pdf);
       const float mis_weight =
@@ -270,15 +277,16 @@ evaluate_surface_lighting(const Scene& scene, const Ray& ray, const HitRecord& r
       const float n_dot_h = fmaxf(0.0f, dot(record.normal, half_vector));
       const float v_dot_h = fmaxf(0.0f, dot(view_direction, half_vector));
       if (n_dot_v > 0.0f && n_dot_h > 0.0f && v_dot_h > 1.0e-6f) {
+        const float specular_roughness = surface_specular_roughness(material);
         const float distribution = ggx_anisotropic_distribution(
-            record.normal, record.tangent, half_vector, material.roughness, material.anisotropy);
-        const float geometry = ggx_geometry(n_dot_v, cosine, material.roughness);
+            record.normal, record.tangent, half_vector, specular_roughness, material.anisotropy);
+        const float geometry = ggx_geometry(n_dot_v, cosine, specular_roughness);
         const Vec3 fresnel = schlick_fresnel(specular_f0, v_dot_h);
         specular_brdf =
             fresnel * (distribution * geometry / fmaxf(1.0e-6f, 4.0f * n_dot_v * cosine));
         specular_pdf =
             ggx_anisotropic_reflection_pdf(record.normal, record.tangent, half_vector, v_dot_h,
-                                           material.roughness, material.anisotropy);
+                                           specular_roughness, material.anisotropy);
       }
       const float mixture_pdf = surface_mixture_pdf(material, diffuse_pdf, specular_pdf);
       const float mis_weight = power_heuristic(light_sample.pdf, mixture_pdf);
@@ -332,7 +340,8 @@ scatter_surface_specular(const Ray& ray, const HitRecord& record, const Material
                          float random_value, int bounce, Vec3& direction, Vec3& throughput_factor,
                          float& next_random, float& bsdf_pdf, const Vec3& specular_f0) {
   const Vec3 incoming = normalized(ray.direction);
-  if (material.roughness <= 0.001f) {
+  const float specular_roughness = surface_specular_roughness(material);
+  if (specular_roughness <= 0.001f) {
     direction = reflect_direction(incoming, record.normal);
     throughput_factor = specular_f0;
     next_random = random_value;
@@ -342,16 +351,16 @@ scatter_surface_specular(const Ray& ray, const HitRecord& record, const Material
   const unsigned int seed = float_bits(random_value) + static_cast<unsigned int>(bounce * 7919);
   const float sample_u = static_cast<float>(sample_hash(seed) & 0x00ffffffU) / 16777216.0f;
   next_random = static_cast<float>(sample_hash(seed + 1U) & 0x00ffffffU) / 16777216.0f;
-  const float alpha = material.roughness * material.roughness;
+  const float alpha = specular_roughness * specular_roughness;
   const float alpha_squared = alpha * alpha;
   const float cos_theta =
       sqrtf((1.0f - next_random) / (1.0f + (alpha_squared - 1.0f) * next_random));
   const float sin_theta = sqrtf(fmaxf(0.0f, 1.0f - cos_theta * cos_theta));
   const float phi = 2.0f * kPi * sample_u;
-  const float isotropic_alpha = fmaxf(0.001f, material.roughness * material.roughness);
+  const float isotropic_alpha = fmaxf(0.001f, specular_roughness * specular_roughness);
   float alpha_x;
   float alpha_y;
-  ggx_anisotropic_alphas(material.roughness, material.anisotropy, alpha_x, alpha_y);
+  ggx_anisotropic_alphas(specular_roughness, material.anisotropy, alpha_x, alpha_y);
   const Vec3 local_half{sin_theta * cosf(phi) * alpha_x / isotropic_alpha,
                         sin_theta * sinf(phi) * alpha_y / isotropic_alpha, cos_theta};
   const Vec3 tangent = record.tangent;
@@ -370,11 +379,11 @@ scatter_surface_specular(const Ray& ray, const HitRecord& record, const Material
     bsdf_pdf = 0.0f;
     return;
   }
-  const float geometry = ggx_geometry(n_dot_v, n_dot_l, material.roughness);
+  const float geometry = ggx_geometry(n_dot_v, n_dot_l, specular_roughness);
   const Vec3 fresnel = schlick_fresnel(specular_f0, v_dot_h);
   throughput_factor = fresnel * (geometry * v_dot_h / fmaxf(1.0e-6f, n_dot_v * n_dot_h));
   bsdf_pdf = ggx_anisotropic_reflection_pdf(record.normal, record.tangent, half_vector, v_dot_h,
-                                            material.roughness, material.anisotropy);
+                                            specular_roughness, material.anisotropy);
 }
 
 RAYPALETTE_HOST_DEVICE inline float emissive_sphere_pdf(const Scene& scene, const Ray& ray,

@@ -73,8 +73,9 @@ inline void apply_material_preset(Material& material, MaterialPreset preset) {
     break;
   case MaterialPreset::Glossy:
     material.metallic = 0.0f;
-    material.roughness = 0.28f;
-    material.coat = 0.0f;
+    material.roughness = 0.22f;
+    material.coat = 0.7f;
+    material.coat_roughness = 0.04f;
     material.sheen = 0.0f;
     material.subsurface = 0.0f;
     material.anisotropy = 0.0f;

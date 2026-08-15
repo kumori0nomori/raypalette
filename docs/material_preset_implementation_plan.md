@@ -122,12 +122,12 @@ resolverはプリセットの標準値と、`Material` に保存されたユー�
 | Custom | 維持 | 維持 | 維持 | 維持 | 維持 | 維持 |
 | Matte | 0.0 | 0.85 | 0.0 | 0.0 | 0.0 | 0.0 |
 | Metal | 1.0 | 0.25 | 0.0 | 0.0 | 0.0 | 0.0 |
-| Glossy | 0.0 | 0.28 | 0.0 | 0.0 | 0.0 | 0.0 |
+| Glossy | 0.0 | 0.22 | 0.7 | 0.0 | 0.0 | 0.0 |
 | Cloth | 0.0 | 0.80 | 0.0 | 0.6 | 0.0 | 0.0 |
 | Skin | 0.0 | 0.45 | 0.0 | 0.0 | 0.35 | 0.0 |
 | Hair | 0.0 | 0.35 | 0.0 | 0.0 | 0.0 | 0.8 |
 
-ClothのSheenとSkinのSubsurfaceは、それぞれtangentを使わないgrazing-angle近似とwrapped diffuse近似として実装し、本格的な布地モデルやSSSとは区別する。Hairは接線付き異方性GGXのSurface近似として実装し、専用Hair BSDFは今後の拡張とする。
+ClothのSheenとSkinのSubsurfaceは、それぞれtangentを使わないgrazing-angle近似とwrapped diffuse近似として実装し、本格的な布地モデルやSSSとは区別する。Hairは接線付き異方性GGXのSurface近似として実装し、専用Hair BSDFは今後の拡張とする。Coatは既存specularのF0/roughnessを薄い透明コート側へ寄せる近似として実装する。
 
 ## 5. 散乱処理
 
@@ -191,7 +191,7 @@ Roughness
 - `Metallic` と `Specular` は `Material details` で表示する
 - `Sheen` と `Subsurface` は `Material details` で表示する
 - `Anisotropy` は `Material details` で表示する
-- 未実装のcoatはGUIに表示しない
+- `Coat` は `Material details` で表示する
 - プリセット選択時は色を保持し、材質特性の標準値を適用する
 - プリセット適用後にroughnessを変更しても、選択中のプリセット名は維持する
 - `Reset preset values` は必要になった時点で追加する
@@ -223,6 +223,7 @@ Hair、Skin、Clothをbackend実装前に表示する場合は、名前だけで
 - [x] Surface typeとSurface presetの2段Comboへ変更する
 - [x] 共通Color/Roughness UIへ整理する
 - [x] Material detailsにMetallic/Specularを追加する
+- [x] Material detailsにCoatを追加する
 - [x] プリセット値のリセット操作を追加する
 - [x] 既存Glass/Emissionの操作を維持する
 
