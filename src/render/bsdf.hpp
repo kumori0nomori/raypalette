@@ -8,9 +8,9 @@ namespace raypalette {
 constexpr float kPi = 3.14159265358979323846f;
 
 //
-// Compute the reflected direction and the refracted direction for a dielectric material.
-// - Reflection: light reflects off an object's surface like a mirror. (metal)
-// - Refraction: light bends as it passes through a transparent material. (glass)
+// Compute reflection and refraction directions used by Surface and Dielectric materials.
+// - Reflection: light reflects from a surface.
+// - Refraction: light bends as it passes through a transparent material.
 //
 
 RAYPALETTE_HOST_DEVICE constexpr Vec3 reflect_direction(const Vec3& incoming, const Vec3& normal) {
@@ -59,8 +59,8 @@ RAYPALETTE_HOST_DEVICE inline float schlick_reflectance(float cosine, float eta_
   return reflectance + (1.0f - reflectance) * powf(1.0f - cosine, 5.0f);
 }
 
-// Metallic Fresnel reflectance using an RGB base reflectance (F0).
-// Returns a colored reflection factor for the GGX BRDF.
+// Schlick Fresnel reflectance using an RGB base reflectance (F0).
+// Returns a colored reflection factor for the GGX Surface BRDF.
 // F = F0 + (1 - F0) * (1 - cos(theta))^5
 // Reference:
 // - https://ja.wikipedia.org/wiki/%E3%83%95%E3%83%AC%E3%83%8D%E3%83%ルの式
