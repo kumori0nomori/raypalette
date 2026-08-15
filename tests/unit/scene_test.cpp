@@ -1,6 +1,7 @@
 #include "render/bsdf.hpp"
 #include "render/light_sampling.hpp"
 #include "render/scene.hpp"
+#include "render/tracer.hpp"
 
 #include <gtest/gtest.h>
 
@@ -9,7 +10,7 @@
 namespace raypalette {
 namespace {
 
-TEST(Material, AcceptsDefaultDiffuseMaterial) {
+TEST(Material, AcceptsDefaultSurfaceMaterial) {
   EXPECT_TRUE(is_valid_material({}));
 }
 
@@ -29,6 +30,22 @@ TEST(Material, ResolvesSurfacePresets) {
   apply_material_preset(material, MaterialPreset::Cloth);
   const PrincipledParameters cloth = resolve_principled_parameters(material);
   EXPECT_FLOAT_EQ(cloth.sheen, 0.6f);
+}
+
+TEST(Material, UsesConsistentSurfaceMixturePdf) {
+  Material surface;
+  const float diffuse_pdf = 0.25f;
+  const float specular_pdf = 0.75f;
+  const float mixture_pdf = detail::surface_mixture_pdf(surface, diffuse_pdf, specular_pdf);
+  EXPECT_GT(detail::surface_specular_probability(surface), 0.0f);
+  EXPECT_LT(detail::surface_specular_probability(surface), 1.0f);
+  EXPECT_GT(mixture_pdf, diffuse_pdf);
+  EXPECT_LT(mixture_pdf, specular_pdf);
+  EXPECT_TRUE(std::isfinite(mixture_pdf));
+
+  apply_material_preset(surface, MaterialPreset::Metal);
+  EXPECT_FLOAT_EQ(detail::surface_specular_probability(surface), 1.0f);
+  EXPECT_FLOAT_EQ(detail::surface_mixture_pdf(surface, diffuse_pdf, specular_pdf), specular_pdf);
 }
 
 TEST(Material, RejectsInvalidPhysicalParameters) {

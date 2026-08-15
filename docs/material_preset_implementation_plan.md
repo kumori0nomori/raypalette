@@ -208,11 +208,11 @@ Hair、Skin、Clothをbackend実装前に表示する場合は、名前だけで
 
 ### Phase 2: 共通Surface BSDF
 
-- diffuseとspecularの評価を共通化する
-- metallicによりdiffuseを制御する
-- GGXの評価、PDF、throughputを共通化する
-- direct lightingとpath samplingで同じローブ選択/PDFを使う
-- `trace_color()` のDiffuse/Metal個別分岐を削除する
+- [x] diffuseとspecularの評価を共通化する
+- [x] metallicによりdiffuseを制御する
+- [x] GGXの評価、PDF、throughputを共通化する
+- [x] direct lightingとpath samplingで同じローブ選択/PDFを使う
+- [x] `trace_color()` のDiffuse/Metal個別分岐を削除する
 
 ### Phase 3: 基本プリセットとGUI
 

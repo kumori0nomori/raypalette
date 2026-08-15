@@ -162,6 +162,12 @@ RAYPALETTE_HOST_DEVICE inline float surface_specular_probability(const Material&
   return fminf(0.95f, fmaxf(0.05f, maximum_f0));
 }
 
+RAYPALETTE_HOST_DEVICE inline float surface_mixture_pdf(const Material& material, float diffuse_pdf,
+                                                        float specular_pdf) {
+  const float specular_probability = surface_specular_probability(material);
+  return (1.0f - specular_probability) * diffuse_pdf + specular_probability * specular_pdf;
+}
+
 RAYPALETTE_HOST_DEVICE inline float surface_specular_pdf(const Ray& ray, const HitRecord& record,
                                                          const Vec3& direction, float roughness) {
   const Vec3 view_direction = normalized(-ray.direction);
@@ -172,7 +178,7 @@ RAYPALETTE_HOST_DEVICE inline float surface_specular_pdf(const Ray& ray, const H
 }
 
 RAYPALETTE_HOST_DEVICE inline Vec3
-evaluate_diffuse_lighting(const Scene& scene, const Ray& ray, const HitRecord& record,
+evaluate_surface_lighting(const Scene& scene, const Ray& ray, const HitRecord& record,
                           const Material& material, float minimum_distance, int light_sample_count,
                           float random_value) {
   const float diffuse_weight = 1.0f - material.metallic;
@@ -186,8 +192,6 @@ evaluate_diffuse_lighting(const Scene& scene, const Ray& ray, const HitRecord& r
       continue;
     const float cosine = fmaxf(0.0f, dot(record.normal, light_sample.direction_to_light));
     if (cosine > 0.0f && visible_to_light(scene, record, light_sample, minimum_distance)) {
-      const float specular_probability = surface_specular_probability(material);
-      const float diffuse_probability = 1.0f - specular_probability;
       const float diffuse_pdf = cosine / kPi;
       float specular_pdf = 0.0f;
       Vec3 specular_brdf;
@@ -205,8 +209,7 @@ evaluate_diffuse_lighting(const Scene& scene, const Ray& ray, const HitRecord& r
             fresnel * (distribution * geometry / fmaxf(1.0e-6f, 4.0f * n_dot_v * cosine));
         specular_pdf = ggx_reflection_pdf(n_dot_h, v_dot_h, material.roughness);
       }
-      const float mixture_pdf =
-          diffuse_probability * diffuse_pdf + specular_probability * specular_pdf;
+      const float mixture_pdf = surface_mixture_pdf(material, diffuse_pdf, specular_pdf);
       const float mis_weight =
           light_sample.pdf <= 0.0f ? 1.0f : power_heuristic(light_sample.pdf, mixture_pdf);
       direct_light += (diffuse_weight * material.base_color + specular_brdf) *
@@ -223,8 +226,6 @@ evaluate_diffuse_lighting(const Scene& scene, const Ray& ray, const HitRecord& r
       continue;
     const float cosine = fmaxf(0.0f, dot(record.normal, light_sample.direction_to_light));
     if (cosine > 0.0f && visible_to_light(scene, record, light_sample, minimum_distance)) {
-      const float specular_probability = surface_specular_probability(material);
-      const float diffuse_probability = 1.0f - specular_probability;
       const float diffuse_pdf = cosine / kPi;
       float specular_pdf = 0.0f;
       Vec3 specular_brdf;
@@ -241,8 +242,7 @@ evaluate_diffuse_lighting(const Scene& scene, const Ray& ray, const HitRecord& r
             fresnel * (distribution * geometry / fmaxf(1.0e-6f, 4.0f * n_dot_v * cosine));
         specular_pdf = ggx_reflection_pdf(n_dot_h, v_dot_h, material.roughness);
       }
-      const float mixture_pdf =
-          diffuse_probability * diffuse_pdf + specular_probability * specular_pdf;
+      const float mixture_pdf = surface_mixture_pdf(material, diffuse_pdf, specular_pdf);
       const float mis_weight = power_heuristic(light_sample.pdf, mixture_pdf);
       emissive_direct_light += (diffuse_weight * material.base_color + specular_brdf) *
                                light_sample.radiance * cosine * mis_weight;
@@ -252,9 +252,9 @@ evaluate_diffuse_lighting(const Scene& scene, const Ray& ray, const HitRecord& r
   return ambient + direct_light + emissive_direct_light;
 }
 
-RAYPALETTE_HOST_DEVICE inline Vec3 next_diffuse_direction(const HitRecord& record,
-                                                          float random_value, int bounce,
-                                                          float& next_random) {
+RAYPALETTE_HOST_DEVICE inline Vec3 sample_surface_diffuse_direction(const HitRecord& record,
+                                                                    float random_value, int bounce,
+                                                                    float& next_random) {
   const unsigned int random_bits = float_bits(random_value);
   next_random =
       static_cast<float>(sample_hash(random_bits + static_cast<unsigned int>(bounce + 1)) &
@@ -396,7 +396,7 @@ RAYPALETTE_HOST_DEVICE inline Vec3 trace_color(const Scene& scene, const Ray& ra
       const float specular_probability = surface_specular_probability(resolved_material);
       const float diffuse_probability = 1.0f - specular_probability;
       path_radiance +=
-          throughput * evaluate_diffuse_lighting(scene, current_ray, record, resolved_material,
+          throughput * evaluate_surface_lighting(scene, current_ray, record, resolved_material,
                                                  minimum_distance, light_sample_count, path_random);
       if (bounce >= max_bounces || !apply_russian_roulette(throughput, path_random, bounce)) {
         return path_radiance;
@@ -411,8 +411,7 @@ RAYPALETTE_HOST_DEVICE inline Vec3 trace_color(const Scene& scene, const Ray& ra
                                  direction, throughput_factor, next_random, specular_pdf,
                                  surface_specular_f0(resolved_material));
         const float diffuse_pdf = fmaxf(0.0f, dot(record.normal, direction)) / kPi;
-        const float mixture_pdf =
-            diffuse_probability * diffuse_pdf + specular_probability * specular_pdf;
+        const float mixture_pdf = surface_mixture_pdf(resolved_material, diffuse_pdf, specular_pdf);
         throughput = throughput * throughput_factor / fmaxf(1.0e-6f, specular_probability);
         previous_bsdf_pdf = mixture_pdf;
         previous_scatter_was_delta = specular_pdf <= 0.0f;
@@ -420,12 +419,11 @@ RAYPALETTE_HOST_DEVICE inline Vec3 trace_color(const Scene& scene, const Ray& ra
         path_random = next_random;
       } else {
         const Vec3 scattered_direction =
-            next_diffuse_direction(record, path_random, bounce, path_random);
+            sample_surface_diffuse_direction(record, path_random, bounce, path_random);
         const float diffuse_pdf = fmaxf(0.0f, dot(record.normal, scattered_direction)) / kPi;
         const float specular_pdf = surface_specular_pdf(current_ray, record, scattered_direction,
                                                         resolved_material.roughness);
-        const float mixture_pdf =
-            diffuse_probability * diffuse_pdf + specular_probability * specular_pdf;
+        const float mixture_pdf = surface_mixture_pdf(resolved_material, diffuse_pdf, specular_pdf);
         throughput =
             throughput * resolved_material.base_color / fmaxf(1.0e-6f, diffuse_probability);
         previous_bsdf_pdf = mixture_pdf;
