@@ -5,6 +5,8 @@
 
 namespace raypalette {
 
+constexpr float kPi = 3.14159265358979323846f;
+
 //
 // Compute the reflected direction and the refracted direction for a dielectric material.
 // - Reflection: light reflects off an object's surface like a mirror. (metal)
@@ -72,12 +74,38 @@ RAYPALETTE_HOST_DEVICE inline Vec3 schlick_fresnel(const Vec3& f0, float cosine)
 // Reference:
 // - https://hanecci.hatenadiary.org/entry/20130511/p1
 RAYPALETTE_HOST_DEVICE inline float ggx_distribution(float n_dot_h, float roughness) {
-  constexpr float pi = 3.14159265358979323846f;
   const float alpha = fmaxf(0.001f, roughness * roughness);
   const float alpha_squared = alpha * alpha;
   const float n_dot_h_squared = n_dot_h * n_dot_h;
   const float denominator = n_dot_h_squared * (alpha_squared - 1.0f) + 1.0f;
-  return alpha_squared / (pi * denominator * denominator);
+  return alpha_squared / (kPi * denominator * denominator);
+}
+
+RAYPALETTE_HOST_DEVICE inline void ggx_anisotropic_alphas(float roughness, float anisotropy,
+                                                          float& alpha_x, float& alpha_y) {
+  const float aspect = sqrtf(fmaxf(0.1f, 1.0f - 0.9f * fabsf(anisotropy)));
+  const float alpha = fmaxf(0.001f, roughness * roughness);
+  alpha_x = alpha / aspect;
+  alpha_y = alpha * aspect;
+}
+
+RAYPALETTE_HOST_DEVICE inline float
+ggx_anisotropic_distribution(const Vec3& normal, const Vec3& tangent, const Vec3& half_vector,
+                             float roughness, float anisotropy) {
+  if (fabsf(anisotropy) <= 1.0e-6f) {
+    return ggx_distribution(dot(normal, half_vector), roughness);
+  }
+  const Vec3 bitangent = cross(normal, tangent);
+  const float h_tangent = dot(half_vector, tangent);
+  const float h_bitangent = dot(half_vector, bitangent);
+  const float h_normal = fmaxf(0.0f, dot(half_vector, normal));
+  float alpha_x;
+  float alpha_y;
+  ggx_anisotropic_alphas(roughness, anisotropy, alpha_x, alpha_y);
+  const float scaled_squared = (h_tangent * h_tangent) / (alpha_x * alpha_x) +
+                               (h_bitangent * h_bitangent) / (alpha_y * alpha_y) +
+                               h_normal * h_normal;
+  return 1.0f / fmaxf(1.0e-12f, kPi * alpha_x * alpha_y * scaled_squared * scaled_squared);
 }
 
 // Approximating shadowing and masking by microfacets. (Schlick-GGX model)
@@ -102,6 +130,17 @@ RAYPALETTE_HOST_DEVICE inline float ggx_reflection_pdf(float n_dot_h, float v_do
     return 0.0f;
   }
   return ggx_distribution(n_dot_h, roughness) * n_dot_h / (4.0f * v_dot_h);
+}
+
+RAYPALETTE_HOST_DEVICE inline float
+ggx_anisotropic_reflection_pdf(const Vec3& normal, const Vec3& tangent, const Vec3& half_vector,
+                               float v_dot_h, float roughness, float anisotropy) {
+  const float n_dot_h = fmaxf(0.0f, dot(normal, half_vector));
+  if (n_dot_h <= 0.0f || v_dot_h <= 1.0e-6f) {
+    return 0.0f;
+  }
+  return ggx_anisotropic_distribution(normal, tangent, half_vector, roughness, anisotropy) *
+         n_dot_h / (4.0f * v_dot_h);
 }
 
 } // namespace raypalette

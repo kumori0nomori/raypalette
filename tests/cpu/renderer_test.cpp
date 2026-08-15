@@ -101,6 +101,23 @@ TEST(CpuRenderer, SkinSubsurfaceChangesDirectLighting) {
   EXPECT_GT(image_difference(matte, skin), 1.0e-5f);
 }
 
+TEST(CpuRenderer, HairAnisotropyChangesDirectLighting) {
+  Scene glossy_scene = make_default_scene();
+  apply_material_preset(glossy_scene.materials[kSphereMaterialIndex], MaterialPreset::Glossy);
+  glossy_scene.materials[kSphereMaterialIndex].roughness = 0.35f;
+  Scene hair_scene = glossy_scene;
+  apply_material_preset(hair_scene.materials[kSphereMaterialIndex], MaterialPreset::Hair);
+
+  const Camera camera = make_default_camera(1.0f);
+  const RenderSettings settings{16, 16, 0.001f, 1, 1};
+  Renderer glossy_renderer;
+  Renderer hair_renderer;
+  const Image glossy = glossy_renderer.render(glossy_scene, camera, settings);
+  const Image hair = hair_renderer.render(hair_scene, camera, settings);
+
+  EXPECT_GT(image_difference(glossy, hair), 1.0e-5f);
+}
+
 TEST(CpuRenderer, SupportsSixteenAreaLightSamples) {
   Scene scene = make_default_scene();
   scene.light = make_rect_area_light({4.0f, 35.0f, 45.0f}, scene.sphere.center, {0.0f, -1.0f, 0.0f},

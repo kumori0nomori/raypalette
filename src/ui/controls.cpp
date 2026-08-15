@@ -201,6 +201,8 @@ void draw_controls(ControlsContext& context) {
         details_changed |= ImGui::SliderFloat("Sheen", &sphere_material.sheen, 0.0f, 1.0f);
         details_changed |=
             ImGui::SliderFloat("Subsurface", &sphere_material.subsurface, 0.0f, 1.0f);
+        details_changed |=
+            ImGui::SliderFloat("Anisotropy", &sphere_material.anisotropy, -1.0f, 1.0f);
         if (details_changed) {
           context.request_render();
         }

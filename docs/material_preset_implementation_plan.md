@@ -127,7 +127,7 @@ resolverはプリセットの標準値と、`Material` に保存されたユー�
 | Skin | 0.0 | 0.45 | 0.0 | 0.0 | 0.35 | 0.0 |
 | Hair | 0.0 | 0.35 | 0.0 | 0.0 | 0.0 | 0.8 |
 
-Hairのローブが未実装の段階では、対応するパラメータを保持してもレンダリングへ影響させない。ClothのSheenとSkinのSubsurfaceは、それぞれtangentを使わないgrazing-angle近似とwrapped diffuse近似として実装し、本格的な布地モデルやSSSとは区別する。
+ClothのSheenとSkinのSubsurfaceは、それぞれtangentを使わないgrazing-angle近似とwrapped diffuse近似として実装し、本格的な布地モデルやSSSとは区別する。Hairは接線付き異方性GGXのSurface近似として実装し、専用Hair BSDFは今後の拡張とする。
 
 ## 5. 散乱処理
 
@@ -190,7 +190,8 @@ Roughness
 - EmissiveではEmission color、Emission strengthを表示する
 - `Metallic` と `Specular` は `Material details` で表示する
 - `Sheen` と `Subsurface` は `Material details` で表示する
-- 未実装のcoat、anisotropyはGUIに表示しない
+- `Anisotropy` は `Material details` で表示する
+- 未実装のcoatはGUIに表示しない
 - プリセット選択時は色を保持し、材質特性の標準値を適用する
 - プリセット適用後にroughnessを変更しても、選択中のプリセット名は維持する
 - `Reset preset values` は必要になった時点で追加する
@@ -235,10 +236,11 @@ Hair、Skin、Clothをbackend実装前に表示する場合は、名前だけで
 
 ### Phase 5: Hair / Anisotropic
 
-- ジオメトリに接線情報を追加する
-- 異方性GGXまたはHair専用BSDFの方針を決定する
-- 異方性用のsampling/PDF/MISを追加する
-- Hairプリセットを有効化する
+- [x] ジオメトリに接線情報を追加する
+- [x] 接線付き異方性GGXをSurfaceローブとして採用する
+- [x] 異方性用のsampling/PDF/MISを追加する
+- [x] Hairプリセットを有効化する
+- [ ] 専用Hair BSDFの要否を追加検討する
 
 ## 8. 互換性と移行
 
