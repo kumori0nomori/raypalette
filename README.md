@@ -56,7 +56,7 @@ Get-FileHash .\raypalette.exe -Algorithm SHA256
     | `Diffuse` | 光を拡散反射するマットな材質 | チョークや粘土、石膏、コピー用紙、布製品 | `Color` |
     | `Metal` | 金属のように光を反射する材質 | 鏡、金属、車のボディ | `Color`, `Roughness` |
     | `Glass` | 光の反射・屈折と内部吸収を表現する透明な材質 | 窓ガラス、レンズ、すりガラス、氷 | `Glass tint`, `Glass absorption density`, `Glass IOR` |
-    | `Emissive` | 自ら光を放つ発光材質 | 液晶画面、ネオン管、蛍光灯 | `Sphere emission`, `Emission` |
+    | `Emissive` | 自ら光を放つ発光材質 | 液晶画面、ネオン管、蛍光灯 | `Emission color`, `Emission strength` |
 
     各設定値(`Color`、`Roughness`など)の詳細を以下に記載します。
 
