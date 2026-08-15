@@ -220,6 +220,7 @@ Hair、Skin、Clothをbackend実装前に表示する場合は、名前だけで
 - [x] direct lightingとpath samplingで同じローブ選択/PDFを使う
 - [x] `trace_color()` のDiffuse/Metal個別分岐を削除する
 - [x] Surface評価関数へPrincipledParametersを直接渡す
+- [x] 通常ライトとemissive sphereのSurface評価を共通helperへ抽出する
 
 ### Phase 3: 基本プリセットとGUI
 

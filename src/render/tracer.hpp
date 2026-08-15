@@ -207,11 +207,51 @@ RAYPALETTE_HOST_DEVICE inline float surface_specular_pdf(const Ray& ray, const H
 }
 
 RAYPALETTE_HOST_DEVICE inline Vec3
+evaluate_surface_light_sample(const Ray& ray, const HitRecord& record,
+                              const PrincipledParameters& material,
+                              const LightSample& light_sample) {
+  const float cosine = fmaxf(0.0f, dot(record.normal, light_sample.direction_to_light));
+  const float subsurface_cosine =
+      surface_subsurface_cosine(record, material, light_sample.direction_to_light);
+  if (cosine <= 0.0f && subsurface_cosine <= 0.0f) {
+    return {};
+  }
+
+  const float diffuse_pdf = cosine / kPi;
+  float specular_pdf = 0.0f;
+  Vec3 specular_brdf;
+  const Vec3 view_direction = normalized(-ray.direction);
+  const Vec3 half_vector = normalized(view_direction + light_sample.direction_to_light);
+  const float n_dot_v = fmaxf(0.0f, dot(record.normal, view_direction));
+  const float n_dot_h = fmaxf(0.0f, dot(record.normal, half_vector));
+  const float v_dot_h = fmaxf(0.0f, dot(view_direction, half_vector));
+  if (n_dot_v > 0.0f && n_dot_h > 0.0f && v_dot_h > 1.0e-6f) {
+    const float specular_roughness = surface_specular_roughness(material);
+    const float distribution = ggx_anisotropic_distribution(
+        record.normal, record.tangent, half_vector, specular_roughness, material.anisotropy);
+    const float geometry = ggx_geometry(n_dot_v, cosine, specular_roughness);
+    const Vec3 fresnel = schlick_fresnel(surface_specular_f0(material), v_dot_h);
+    specular_brdf = fresnel * (distribution * geometry / fmaxf(1.0e-6f, 4.0f * n_dot_v * cosine));
+    specular_pdf = ggx_anisotropic_reflection_pdf(record.normal, record.tangent, half_vector,
+                                                  v_dot_h, specular_roughness, material.anisotropy);
+  }
+
+  const float mixture_pdf = surface_mixture_pdf(material, diffuse_pdf, specular_pdf);
+  const float mis_weight =
+      light_sample.pdf <= 0.0f ? 1.0f : power_heuristic(light_sample.pdf, mixture_pdf);
+  const float sheen_factor =
+      surface_sheen_factor(ray, record, material, light_sample.direction_to_light);
+  const float diffuse_weight = 1.0f - material.metallic;
+  const Vec3 diffuse_brdf =
+      material.base_color * (diffuse_weight * cosine + sheen_factor * cosine + subsurface_cosine);
+  return (diffuse_brdf + specular_brdf * cosine) * light_sample.radiance * mis_weight;
+}
+
+RAYPALETTE_HOST_DEVICE inline Vec3
 evaluate_surface_lighting(const Scene& scene, const Ray& ray, const HitRecord& record,
                           const PrincipledParameters& material, float minimum_distance,
                           int light_sample_count, float random_value) {
   const float diffuse_weight = 1.0f - material.metallic;
-  const Vec3 specular_f0 = surface_specular_f0(material);
   const Vec3 ambient =
       material.base_color * diffuse_weight * scene.environment.color * scene.environment.intensity;
   Vec3 direct_light;
@@ -219,41 +259,8 @@ evaluate_surface_lighting(const Scene& scene, const Ray& ray, const HitRecord& r
     LightSample light_sample;
     if (!try_sample_light(scene, record, sample_index, light_sample_count, light_sample))
       continue;
-    const float raw_cosine = dot(record.normal, light_sample.direction_to_light);
-    const float cosine = fmaxf(0.0f, raw_cosine);
-    const float subsurface_cosine =
-        surface_subsurface_cosine(record, material, light_sample.direction_to_light);
-    if ((cosine > 0.0f || subsurface_cosine > 0.0f) &&
-        visible_to_light(scene, record, light_sample, minimum_distance)) {
-      const float diffuse_pdf = cosine / kPi;
-      float specular_pdf = 0.0f;
-      Vec3 specular_brdf;
-
-      const Vec3 view_direction = normalized(-ray.direction);
-      const Vec3 half_vector = normalized(view_direction + light_sample.direction_to_light);
-      const float n_dot_v = fmaxf(0.0f, dot(record.normal, view_direction));
-      const float n_dot_h = fmaxf(0.0f, dot(record.normal, half_vector));
-      const float v_dot_h = fmaxf(0.0f, dot(view_direction, half_vector));
-      if (n_dot_v > 0.0f && n_dot_h > 0.0f && v_dot_h > 1.0e-6f) {
-        const float specular_roughness = surface_specular_roughness(material);
-        const float distribution = ggx_anisotropic_distribution(
-            record.normal, record.tangent, half_vector, specular_roughness, material.anisotropy);
-        const float geometry = ggx_geometry(n_dot_v, cosine, specular_roughness);
-        const Vec3 fresnel = schlick_fresnel(specular_f0, v_dot_h);
-        specular_brdf =
-            fresnel * (distribution * geometry / fmaxf(1.0e-6f, 4.0f * n_dot_v * cosine));
-        specular_pdf =
-            ggx_anisotropic_reflection_pdf(record.normal, record.tangent, half_vector, v_dot_h,
-                                           specular_roughness, material.anisotropy);
-      }
-      const float mixture_pdf = surface_mixture_pdf(material, diffuse_pdf, specular_pdf);
-      const float mis_weight =
-          light_sample.pdf <= 0.0f ? 1.0f : power_heuristic(light_sample.pdf, mixture_pdf);
-      const float sheen_factor =
-          surface_sheen_factor(ray, record, material, light_sample.direction_to_light);
-      const Vec3 diffuse_brdf = material.base_color * (diffuse_weight * cosine +
-                                                       sheen_factor * cosine + subsurface_cosine);
-      direct_light += (diffuse_brdf + specular_brdf * cosine) * light_sample.radiance * mis_weight;
+    if (visible_to_light(scene, record, light_sample, minimum_distance)) {
+      direct_light += evaluate_surface_light_sample(ray, record, material, light_sample);
     }
   }
   if (scene.light.type == LightType::RectArea)
@@ -264,40 +271,8 @@ evaluate_surface_lighting(const Scene& scene, const Ray& ray, const HitRecord& r
     LightSample light_sample;
     if (!try_sample_emissive_sphere(scene, record, sample_index, random_value, light_sample))
       continue;
-    const float raw_cosine = dot(record.normal, light_sample.direction_to_light);
-    const float cosine = fmaxf(0.0f, raw_cosine);
-    const float subsurface_cosine =
-        surface_subsurface_cosine(record, material, light_sample.direction_to_light);
-    if ((cosine > 0.0f || subsurface_cosine > 0.0f) &&
-        visible_to_light(scene, record, light_sample, minimum_distance)) {
-      const float diffuse_pdf = cosine / kPi;
-      float specular_pdf = 0.0f;
-      Vec3 specular_brdf;
-      const Vec3 view_direction = normalized(-ray.direction);
-      const Vec3 half_vector = normalized(view_direction + light_sample.direction_to_light);
-      const float n_dot_v = fmaxf(0.0f, dot(record.normal, view_direction));
-      const float n_dot_h = fmaxf(0.0f, dot(record.normal, half_vector));
-      const float v_dot_h = fmaxf(0.0f, dot(view_direction, half_vector));
-      if (n_dot_v > 0.0f && n_dot_h > 0.0f && v_dot_h > 1.0e-6f) {
-        const float specular_roughness = surface_specular_roughness(material);
-        const float distribution = ggx_anisotropic_distribution(
-            record.normal, record.tangent, half_vector, specular_roughness, material.anisotropy);
-        const float geometry = ggx_geometry(n_dot_v, cosine, specular_roughness);
-        const Vec3 fresnel = schlick_fresnel(specular_f0, v_dot_h);
-        specular_brdf =
-            fresnel * (distribution * geometry / fmaxf(1.0e-6f, 4.0f * n_dot_v * cosine));
-        specular_pdf =
-            ggx_anisotropic_reflection_pdf(record.normal, record.tangent, half_vector, v_dot_h,
-                                           specular_roughness, material.anisotropy);
-      }
-      const float mixture_pdf = surface_mixture_pdf(material, diffuse_pdf, specular_pdf);
-      const float mis_weight = power_heuristic(light_sample.pdf, mixture_pdf);
-      const float sheen_factor =
-          surface_sheen_factor(ray, record, material, light_sample.direction_to_light);
-      const Vec3 diffuse_brdf = material.base_color * (diffuse_weight * cosine +
-                                                       sheen_factor * cosine + subsurface_cosine);
-      emissive_direct_light +=
-          (diffuse_brdf + specular_brdf * cosine) * light_sample.radiance * mis_weight;
+    if (visible_to_light(scene, record, light_sample, minimum_distance)) {
+      emissive_direct_light += evaluate_surface_light_sample(ray, record, material, light_sample);
     }
   }
   emissive_direct_light *= 1.0f / light_sample_count;
