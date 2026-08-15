@@ -145,7 +145,7 @@ RAYPALETTE_HOST_DEVICE inline Vec3 cosine_sample_direction(const Vec3& normal, f
   return normalized(local.x * tangent + local.y * cross(normal, tangent) + local.z * normal);
 }
 
-RAYPALETTE_HOST_DEVICE inline Vec3 surface_specular_f0(const PrincipledParameters& material) {
+RAYPALETTE_HOST_DEVICE inline Vec3 surface_effective_f0(const PrincipledParameters& material) {
   const float dielectric_f0 = 0.04f * material.specular;
   const Vec3 dielectric_reflectance{dielectric_f0, dielectric_f0, dielectric_f0};
   const Vec3 base_f0 =
@@ -155,7 +155,7 @@ RAYPALETTE_HOST_DEVICE inline Vec3 surface_specular_f0(const PrincipledParameter
 }
 
 RAYPALETTE_HOST_DEVICE inline float
-surface_specular_roughness(const PrincipledParameters& material) {
+surface_effective_roughness(const PrincipledParameters& material) {
   return material.roughness * (1.0f - material.coat) + material.coat_roughness * material.coat;
 }
 
@@ -164,7 +164,7 @@ surface_specular_probability(const PrincipledParameters& material) {
   if (material.metallic >= 1.0f) {
     return 1.0f;
   }
-  const Vec3 f0 = surface_specular_f0(material);
+  const Vec3 f0 = surface_effective_f0(material);
   const float maximum_f0 = fmaxf(f0.x, fmaxf(f0.y, f0.z));
   return fminf(0.95f, fmaxf(0.05f, maximum_f0));
 }
@@ -203,7 +203,7 @@ RAYPALETTE_HOST_DEVICE inline float surface_specular_pdf(const Ray& ray, const H
   const Vec3 half_vector = normalized(view_direction + direction);
   const float v_dot_h = fmaxf(0.0f, dot(view_direction, half_vector));
   return ggx_anisotropic_reflection_pdf(record.normal, record.tangent, half_vector, v_dot_h,
-                                        surface_specular_roughness(material), material.anisotropy);
+                                        surface_effective_roughness(material), material.anisotropy);
 }
 
 RAYPALETTE_HOST_DEVICE inline Vec3
@@ -226,11 +226,11 @@ evaluate_surface_light_sample(const Ray& ray, const HitRecord& record,
   const float n_dot_h = fmaxf(0.0f, dot(record.normal, half_vector));
   const float v_dot_h = fmaxf(0.0f, dot(view_direction, half_vector));
   if (n_dot_v > 0.0f && n_dot_h > 0.0f && v_dot_h > 1.0e-6f) {
-    const float specular_roughness = surface_specular_roughness(material);
+    const float specular_roughness = surface_effective_roughness(material);
     const float distribution = ggx_anisotropic_distribution(
         record.normal, record.tangent, half_vector, specular_roughness, material.anisotropy);
     const float geometry = ggx_geometry(n_dot_v, cosine, specular_roughness);
-    const Vec3 fresnel = schlick_fresnel(surface_specular_f0(material), v_dot_h);
+    const Vec3 fresnel = schlick_fresnel(surface_effective_f0(material), v_dot_h);
     specular_brdf = fresnel * (distribution * geometry / fmaxf(1.0e-6f, 4.0f * n_dot_v * cosine));
     specular_pdf = ggx_anisotropic_reflection_pdf(record.normal, record.tangent, half_vector,
                                                   v_dot_h, specular_roughness, material.anisotropy);
@@ -318,7 +318,7 @@ scatter_surface_specular(const Ray& ray, const HitRecord& record,
                          Vec3& direction, Vec3& throughput_factor, float& next_random,
                          float& bsdf_pdf, const Vec3& specular_f0) {
   const Vec3 incoming = normalized(ray.direction);
-  const float specular_roughness = surface_specular_roughness(material);
+  const float specular_roughness = surface_effective_roughness(material);
   if (specular_roughness <= 0.001f) {
     direction = reflect_direction(incoming, record.normal);
     throughput_factor = specular_f0;
@@ -362,6 +362,45 @@ scatter_surface_specular(const Ray& ray, const HitRecord& record,
   throughput_factor = fresnel * (geometry * v_dot_h / fmaxf(1.0e-6f, n_dot_v * n_dot_h));
   bsdf_pdf = ggx_anisotropic_reflection_pdf(record.normal, record.tangent, half_vector, v_dot_h,
                                             specular_roughness, material.anisotropy);
+}
+
+struct SurfaceSample {
+  Vec3 direction;
+  Vec3 throughput_factor;
+  float pdf = 0.0f;
+  float next_random = 0.0f;
+  bool delta = false;
+};
+
+RAYPALETTE_HOST_DEVICE inline SurfaceSample sample_surface(const Ray& ray, const HitRecord& record,
+                                                           const PrincipledParameters& material,
+                                                           float random_value, int bounce) {
+  SurfaceSample sample;
+  const float specular_probability = surface_specular_probability(material);
+  const float diffuse_probability = 1.0f - specular_probability;
+  if (random_value < specular_probability) {
+    float specular_pdf;
+    scatter_surface_specular(ray, record, material, random_value, bounce, sample.direction,
+                             sample.throughput_factor, sample.next_random, specular_pdf,
+                             surface_effective_f0(material));
+    const float diffuse_pdf = fmaxf(0.0f, dot(record.normal, sample.direction)) / kPi;
+    sample.pdf = surface_mixture_pdf(material, diffuse_pdf, specular_pdf);
+    sample.throughput_factor = sample.throughput_factor / fmaxf(1.0e-6f, specular_probability);
+    sample.delta = specular_pdf <= 0.0f;
+    return sample;
+  }
+
+  sample.direction =
+      sample_surface_diffuse_direction(record, random_value, bounce, sample.next_random);
+  const float diffuse_pdf = fmaxf(0.0f, dot(record.normal, sample.direction)) / kPi;
+  const float specular_pdf = surface_specular_pdf(ray, record, sample.direction, material);
+  sample.pdf = surface_mixture_pdf(material, diffuse_pdf, specular_pdf);
+  const float sheen_factor = surface_sheen_factor(ray, record, material, sample.direction);
+  const float subsurface_factor = surface_subsurface_cosine(record, material, sample.direction);
+  sample.throughput_factor =
+      ((1.0f - material.metallic + sheen_factor + subsurface_factor) * material.base_color) /
+      fmaxf(1.0e-6f, diffuse_probability);
+  return sample;
 }
 
 RAYPALETTE_HOST_DEVICE inline float emissive_sphere_pdf(const Scene& scene, const Ray& ray,
@@ -422,8 +461,6 @@ RAYPALETTE_HOST_DEVICE inline Vec3 trace_color(const Scene& scene, const Ray& ra
     switch (material.type) {
     case MaterialType::Surface: {
       const PrincipledParameters parameters = resolve_principled_parameters(material);
-      const float specular_probability = surface_specular_probability(parameters);
-      const float diffuse_probability = 1.0f - specular_probability;
       path_radiance +=
           throughput * evaluate_surface_lighting(scene, current_ray, record, parameters,
                                                  minimum_distance, light_sample_count, path_random);
@@ -431,40 +468,13 @@ RAYPALETTE_HOST_DEVICE inline Vec3 trace_color(const Scene& scene, const Ray& ra
         return path_radiance;
       }
 
-      if (path_random < specular_probability) {
-        Vec3 direction;
-        Vec3 throughput_factor;
-        float next_random;
-        float specular_pdf;
-        scatter_surface_specular(current_ray, record, parameters, path_random, bounce, direction,
-                                 throughput_factor, next_random, specular_pdf,
-                                 surface_specular_f0(parameters));
-        const float diffuse_pdf = fmaxf(0.0f, dot(record.normal, direction)) / kPi;
-        const float mixture_pdf = surface_mixture_pdf(parameters, diffuse_pdf, specular_pdf);
-        throughput = throughput * throughput_factor / fmaxf(1.0e-6f, specular_probability);
-        previous_bsdf_pdf = mixture_pdf;
-        previous_scatter_was_delta = specular_pdf <= 0.0f;
-        current_ray = {record.position + minimum_distance * record.normal, direction};
-        path_random = next_random;
-      } else {
-        const Vec3 scattered_direction =
-            sample_surface_diffuse_direction(record, path_random, bounce, path_random);
-        const float diffuse_pdf = fmaxf(0.0f, dot(record.normal, scattered_direction)) / kPi;
-        const float specular_pdf =
-            surface_specular_pdf(current_ray, record, scattered_direction, parameters);
-        const float mixture_pdf = surface_mixture_pdf(parameters, diffuse_pdf, specular_pdf);
-        const float sheen_factor =
-            surface_sheen_factor(current_ray, record, parameters, scattered_direction);
-        const float subsurface_factor =
-            surface_subsurface_cosine(record, parameters, scattered_direction);
-        throughput = throughput *
-                     ((1.0f - parameters.metallic + sheen_factor + subsurface_factor) *
-                      parameters.base_color) /
-                     fmaxf(1.0e-6f, diffuse_probability);
-        previous_bsdf_pdf = mixture_pdf;
-        previous_scatter_was_delta = false;
-        current_ray = {record.position + minimum_distance * record.normal, scattered_direction};
-      }
+      const SurfaceSample sample =
+          sample_surface(current_ray, record, parameters, path_random, bounce);
+      throughput = throughput * sample.throughput_factor;
+      previous_bsdf_pdf = sample.pdf;
+      previous_scatter_was_delta = sample.delta;
+      current_ray = {record.position + minimum_distance * record.normal, sample.direction};
+      path_random = sample.next_random;
       continue;
     }
     case MaterialType::Dielectric: {
