@@ -22,6 +22,36 @@ enum class MaterialPreset : std::uint32_t {
   Hair,
 };
 
+struct MaterialCapabilities {
+  bool metallic = false;
+  bool specular = false;
+  bool sheen = false;
+  bool subsurface = false;
+  bool anisotropy = false;
+  bool coat = false;
+  bool coat_roughness = false;
+};
+
+RAYPALETTE_HOST_DEVICE inline MaterialCapabilities material_capabilities(MaterialPreset preset) {
+  switch (preset) {
+  case MaterialPreset::Custom:
+    return {true, true, true, true, true, true, true};
+  case MaterialPreset::Glossy:
+    return {false, true, false, false, false, true, true};
+  case MaterialPreset::Metal:
+    return {true, false, false, false, false, false, false};
+  case MaterialPreset::Cloth:
+    return {false, true, true, false, false, false, false};
+  case MaterialPreset::Skin:
+    return {false, true, false, true, false, false, false};
+  case MaterialPreset::Hair:
+    return {false, true, false, false, true, false, false};
+  case MaterialPreset::Matte:
+    return {false, true, false, false, false, false, false};
+  }
+  return {};
+}
+
 struct Material {
   MaterialType type = MaterialType::Surface;
   MaterialPreset preset = MaterialPreset::Custom;

@@ -73,6 +73,31 @@ TEST(Material, AppliesAllSurfacePresetValues) {
   }
 }
 
+TEST(Material, ExposesPresetCapabilities) {
+  const MaterialCapabilities custom = material_capabilities(MaterialPreset::Custom);
+  EXPECT_TRUE(custom.metallic);
+  EXPECT_TRUE(custom.specular);
+  EXPECT_TRUE(custom.sheen);
+  EXPECT_TRUE(custom.subsurface);
+  EXPECT_TRUE(custom.anisotropy);
+  EXPECT_TRUE(custom.coat);
+  EXPECT_TRUE(custom.coat_roughness);
+
+  const MaterialCapabilities glossy = material_capabilities(MaterialPreset::Glossy);
+  EXPECT_FALSE(glossy.metallic);
+  EXPECT_TRUE(glossy.specular);
+  EXPECT_TRUE(glossy.coat);
+  EXPECT_TRUE(glossy.coat_roughness);
+  EXPECT_FALSE(glossy.sheen);
+  EXPECT_FALSE(glossy.subsurface);
+  EXPECT_FALSE(glossy.anisotropy);
+
+  const MaterialCapabilities hair = material_capabilities(MaterialPreset::Hair);
+  EXPECT_TRUE(hair.specular);
+  EXPECT_TRUE(hair.anisotropy);
+  EXPECT_FALSE(hair.coat);
+}
+
 TEST(Material, CustomPresetPreservesManualSurfaceValues) {
   Material material;
   material.type = MaterialType::Dielectric;
@@ -99,18 +124,20 @@ TEST(Material, CustomPresetPreservesManualSurfaceValues) {
 
 TEST(Material, UsesConsistentSurfaceMixturePdf) {
   Material surface;
+  const PrincipledParameters parameters = resolve_principled_parameters(surface);
   const float diffuse_pdf = 0.25f;
   const float specular_pdf = 0.75f;
-  const float mixture_pdf = detail::surface_mixture_pdf(surface, diffuse_pdf, specular_pdf);
-  EXPECT_GT(detail::surface_specular_probability(surface), 0.0f);
-  EXPECT_LT(detail::surface_specular_probability(surface), 1.0f);
+  const float mixture_pdf = detail::surface_mixture_pdf(parameters, diffuse_pdf, specular_pdf);
+  EXPECT_GT(detail::surface_specular_probability(parameters), 0.0f);
+  EXPECT_LT(detail::surface_specular_probability(parameters), 1.0f);
   EXPECT_GT(mixture_pdf, diffuse_pdf);
   EXPECT_LT(mixture_pdf, specular_pdf);
   EXPECT_TRUE(std::isfinite(mixture_pdf));
 
   apply_material_preset(surface, MaterialPreset::Metal);
-  EXPECT_FLOAT_EQ(detail::surface_specular_probability(surface), 1.0f);
-  EXPECT_FLOAT_EQ(detail::surface_mixture_pdf(surface, diffuse_pdf, specular_pdf), specular_pdf);
+  const PrincipledParameters metal = resolve_principled_parameters(surface);
+  EXPECT_FLOAT_EQ(detail::surface_specular_probability(metal), 1.0f);
+  EXPECT_FLOAT_EQ(detail::surface_mixture_pdf(metal, diffuse_pdf, specular_pdf), specular_pdf);
 }
 
 TEST(Material, RejectsInvalidPhysicalParameters) {

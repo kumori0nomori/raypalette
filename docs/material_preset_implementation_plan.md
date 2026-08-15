@@ -204,12 +204,13 @@ Hair、Skin、Clothをbackend実装前に表示する場合は、名前だけで
 
 ### Phase 1: 型とresolver
 
-- `MaterialPreset` を追加する
-- `MaterialType::Surface` を追加する
-- `PrincipledParameters` と `resolve_principled_parameters()` を追加する
-- 既存の `Diffuse` と `Metal` をSurfaceへ変換する互換処理を追加する
-- Materialの妥当性検証を新しい範囲へ対応させる
-- resolverのunit testを追加する
+- [x] `MaterialPreset` を追加する
+- [x] `MaterialType::Surface` を追加する
+- [x] `PrincipledParameters` と `resolve_principled_parameters()` を追加する
+- [x] 既存の `Diffuse` と `Metal` をSurfaceへ変換する互換処理を追加する
+- [x] Materialの妥当性検証を新しい範囲へ対応させる
+- [x] resolverのunit testを追加する
+- [x] preset capabilityを共通化し、GUIとunit testから利用する
 
 ### Phase 2: 共通Surface BSDF
 
@@ -218,6 +219,7 @@ Hair、Skin、Clothをbackend実装前に表示する場合は、名前だけで
 - [x] GGXの評価、PDF、throughputを共通化する
 - [x] direct lightingとpath samplingで同じローブ選択/PDFを使う
 - [x] `trace_color()` のDiffuse/Metal個別分岐を削除する
+- [x] Surface評価関数へPrincipledParametersを直接渡す
 
 ### Phase 3: 基本プリセットとGUI
 
