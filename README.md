@@ -4,7 +4,9 @@ raypalette は、制御した照明下で球の色が、どのように変化す
 調整し確認するための軽量な CUDA レンダラーです。
 イラスト作成時のHSV空間上での影色選択に用いることができます。
 
-<img src="./assets/screenshots/20260815_v0.1.1_gui.png" alt="実行画面画像" title="実行画面" width="70%">
+<p align="center">
+    <img src="./assets/screenshots/20260815_v0.1.1_gui_demo.gif" alt="操作デモ" title="操作デモ" width="90%">
+</p>
 
 ## 1. 使い方
 
