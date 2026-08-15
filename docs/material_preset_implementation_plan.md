@@ -117,15 +117,15 @@ resolverはプリセットの標準値と、`Material` に保存されたユー�
 
 初期値は物理測定値ではなく、イラスト用プレビューで扱いやすい開始点とする。最終的な数値は標準シーンの比較で調整する。
 
-| Preset | metallic | roughness | coat | sheen | subsurface | anisotropy |
-|---|---:|---:|---:|---:|---:|---:|
-| Custom | 維持 | 維持 | 維持 | 維持 | 維持 | 維持 |
-| Matte | 0.0 | 0.85 | 0.0 | 0.0 | 0.0 | 0.0 |
-| Metal | 1.0 | 0.25 | 0.0 | 0.0 | 0.0 | 0.0 |
-| Glossy | 0.0 | 0.22 | 0.7 | 0.0 | 0.0 | 0.0 |
-| Cloth | 0.0 | 0.80 | 0.0 | 0.6 | 0.0 | 0.0 |
-| Skin | 0.0 | 0.45 | 0.0 | 0.0 | 0.35 | 0.0 |
-| Hair | 0.0 | 0.35 | 0.0 | 0.0 | 0.0 | 0.8 |
+| Preset | metallic | roughness | coat | coat_roughness | sheen | subsurface | anisotropy |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Custom | 維持 | 維持 | 維持 | 維持 | 維持 | 維持 | 維持 |
+| Matte | 0.0 | 0.85 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 |
+| Metal | 1.0 | 0.25 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 |
+| Glossy | 0.0 | 0.22 | 0.7 | 0.04 | 0.0 | 0.0 | 0.0 |
+| Cloth | 0.0 | 0.80 | 0.0 | 0.0 | 0.6 | 0.0 | 0.0 |
+| Skin | 0.0 | 0.45 | 0.0 | 0.0 | 0.0 | 0.35 | 0.0 |
+| Hair | 0.0 | 0.35 | 0.0 | 0.0 | 0.0 | 0.0 | 0.8 |
 
 ClothのSheenとSkinのSubsurfaceは、それぞれtangentを使わないgrazing-angle近似とwrapped diffuse近似として実装し、本格的な布地モデルやSSSとは区別する。Hairは接線付き異方性GGXのSurface近似として実装し、専用Hair BSDFは今後の拡張とする。Coatは既存specularのF0/roughnessを薄い透明コート側へ寄せる近似として実装する。
 

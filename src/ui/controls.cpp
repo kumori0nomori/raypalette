@@ -204,6 +204,8 @@ void draw_controls(ControlsContext& context) {
         details_changed |=
             ImGui::SliderFloat("Anisotropy", &sphere_material.anisotropy, -1.0f, 1.0f);
         details_changed |= ImGui::SliderFloat("Coat", &sphere_material.coat, 0.0f, 1.0f);
+        details_changed |=
+            ImGui::SliderFloat("Coat roughness", &sphere_material.coat_roughness, 0.0f, 1.0f);
         if (details_changed) {
           context.request_render();
         }

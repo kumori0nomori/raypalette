@@ -32,6 +32,8 @@ TEST(Material, ResolvesSurfacePresets) {
   apply_material_preset(material, MaterialPreset::Cloth);
   const PrincipledParameters cloth = resolve_principled_parameters(material);
   EXPECT_FLOAT_EQ(cloth.sheen, 0.6f);
+  EXPECT_FLOAT_EQ(cloth.coat, 0.0f);
+  EXPECT_FLOAT_EQ(cloth.coat_roughness, 0.0f);
 }
 
 TEST(Material, UsesConsistentSurfaceMixturePdf) {

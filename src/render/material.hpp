@@ -67,6 +67,7 @@ inline void apply_material_preset(Material& material, MaterialPreset preset) {
     material.metallic = 0.0f;
     material.roughness = 0.85f;
     material.coat = 0.0f;
+    material.coat_roughness = 0.0f;
     material.sheen = 0.0f;
     material.subsurface = 0.0f;
     material.anisotropy = 0.0f;
@@ -82,6 +83,8 @@ inline void apply_material_preset(Material& material, MaterialPreset preset) {
     break;
   case MaterialPreset::Metal:
     material.metallic = 1.0f;
+    material.coat = 0.0f;
+    material.coat_roughness = 0.0f;
     material.sheen = 0.0f;
     material.subsurface = 0.0f;
     material.anisotropy = 0.0f;
@@ -89,6 +92,8 @@ inline void apply_material_preset(Material& material, MaterialPreset preset) {
   case MaterialPreset::Cloth:
     material.metallic = 0.0f;
     material.roughness = 0.8f;
+    material.coat = 0.0f;
+    material.coat_roughness = 0.0f;
     material.sheen = 0.6f;
     material.subsurface = 0.0f;
     material.anisotropy = 0.0f;
@@ -96,6 +101,8 @@ inline void apply_material_preset(Material& material, MaterialPreset preset) {
   case MaterialPreset::Skin:
     material.metallic = 0.0f;
     material.roughness = 0.45f;
+    material.coat = 0.0f;
+    material.coat_roughness = 0.0f;
     material.sheen = 0.0f;
     material.subsurface = 0.35f;
     material.anisotropy = 0.0f;
@@ -103,6 +110,8 @@ inline void apply_material_preset(Material& material, MaterialPreset preset) {
   case MaterialPreset::Hair:
     material.metallic = 0.0f;
     material.roughness = 0.35f;
+    material.coat = 0.0f;
+    material.coat_roughness = 0.0f;
     material.sheen = 0.0f;
     material.subsurface = 0.0f;
     material.anisotropy = 0.8f;
