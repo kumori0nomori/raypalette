@@ -192,6 +192,8 @@ Roughness
 - `Sheen` と `Subsurface` は `Material details` で表示する
 - `Anisotropy` は `Material details` で表示する
 - `Coat` は `Material details` で表示する
+- presetで無効な詳細パラメータは表示したままdisabledにする
+- `Custom`ではすべての詳細パラメータを編集可能にする
 - プリセット選択時は色を保持し、材質特性の標準値を適用する
 - プリセット適用後にroughnessを変更しても、選択中のプリセット名は維持する
 - `Reset preset values` は必要になった時点で追加する

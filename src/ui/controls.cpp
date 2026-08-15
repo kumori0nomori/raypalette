@@ -15,6 +15,38 @@ constexpr const char* kMaterialPresetLabels[] = {"Custom", "Matte", "Glossy", "M
                                                  "Cloth",  "Skin",  "Hair"};
 constexpr const char* kAreaLightSampleLabels[] = {"4 (2x2)", "9 (3x3)", "16 (4x4)"};
 
+enum class SurfaceParameter {
+  Metallic,
+  Specular,
+  Sheen,
+  Subsurface,
+  Anisotropy,
+  Coat,
+  CoatRoughness,
+};
+
+bool is_surface_parameter_enabled(MaterialPreset preset, SurfaceParameter parameter) {
+  if (preset == MaterialPreset::Custom) {
+    return true;
+  }
+  switch (parameter) {
+  case SurfaceParameter::Metallic:
+    return preset == MaterialPreset::Metal;
+  case SurfaceParameter::Specular:
+    return preset != MaterialPreset::Metal;
+  case SurfaceParameter::Sheen:
+    return preset == MaterialPreset::Cloth;
+  case SurfaceParameter::Subsurface:
+    return preset == MaterialPreset::Skin;
+  case SurfaceParameter::Anisotropy:
+    return preset == MaterialPreset::Hair;
+  case SurfaceParameter::Coat:
+  case SurfaceParameter::CoatRoughness:
+    return preset == MaterialPreset::Glossy;
+  }
+  return false;
+}
+
 int area_light_sample_index(int sample_count) {
   switch (sample_count) {
   case 9:
@@ -196,16 +228,32 @@ void draw_controls(ControlsContext& context) {
       }
       if (ImGui::CollapsingHeader("Material details")) {
         bool details_changed = false;
+        const MaterialPreset preset = sphere_material.preset;
+        ImGui::BeginDisabled(!is_surface_parameter_enabled(preset, SurfaceParameter::Metallic));
         details_changed |= ImGui::SliderFloat("Metallic", &sphere_material.metallic, 0.0f, 1.0f);
+        ImGui::EndDisabled();
+        ImGui::BeginDisabled(!is_surface_parameter_enabled(preset, SurfaceParameter::Specular));
         details_changed |= ImGui::SliderFloat("Specular", &sphere_material.specular, 0.0f, 1.0f);
+        ImGui::EndDisabled();
+        ImGui::BeginDisabled(!is_surface_parameter_enabled(preset, SurfaceParameter::Sheen));
         details_changed |= ImGui::SliderFloat("Sheen", &sphere_material.sheen, 0.0f, 1.0f);
+        ImGui::EndDisabled();
+        ImGui::BeginDisabled(!is_surface_parameter_enabled(preset, SurfaceParameter::Subsurface));
         details_changed |=
             ImGui::SliderFloat("Subsurface", &sphere_material.subsurface, 0.0f, 1.0f);
+        ImGui::EndDisabled();
+        ImGui::BeginDisabled(!is_surface_parameter_enabled(preset, SurfaceParameter::Anisotropy));
         details_changed |=
             ImGui::SliderFloat("Anisotropy", &sphere_material.anisotropy, -1.0f, 1.0f);
+        ImGui::EndDisabled();
+        ImGui::BeginDisabled(!is_surface_parameter_enabled(preset, SurfaceParameter::Coat));
         details_changed |= ImGui::SliderFloat("Coat", &sphere_material.coat, 0.0f, 1.0f);
+        ImGui::EndDisabled();
+        ImGui::BeginDisabled(
+            !is_surface_parameter_enabled(preset, SurfaceParameter::CoatRoughness));
         details_changed |=
             ImGui::SliderFloat("Coat roughness", &sphere_material.coat_roughness, 0.0f, 1.0f);
+        ImGui::EndDisabled();
         if (details_changed) {
           context.request_render();
         }
