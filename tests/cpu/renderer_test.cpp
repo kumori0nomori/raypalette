@@ -17,6 +17,16 @@ bool image_is_finite(const Image& image) {
   return true;
 }
 
+float image_difference(const Image& first, const Image& second) {
+  float difference = 0.0f;
+  for (std::size_t pixel_index = 0; pixel_index < first.pixels.size(); ++pixel_index) {
+    difference += std::fabs(first.pixels[pixel_index].x - second.pixels[pixel_index].x);
+    difference += std::fabs(first.pixels[pixel_index].y - second.pixels[pixel_index].y);
+    difference += std::fabs(first.pixels[pixel_index].z - second.pixels[pixel_index].z);
+  }
+  return difference;
+}
+
 TEST(CpuRenderer, RendersFiniteCanonicalImage) {
   Renderer renderer;
   const Image image =
@@ -39,6 +49,22 @@ TEST(CpuRenderer, RendersFiniteSurfacePresets) {
     const Image image = renderer.render(scene, make_default_camera(1.0f), {4, 4, 0.001f, 1, 1});
     EXPECT_TRUE(image_is_finite(image));
   }
+}
+
+TEST(CpuRenderer, SurfacePresetsChangeDirectLighting) {
+  Scene matte_scene = make_default_scene();
+  apply_material_preset(matte_scene.materials[kSphereMaterialIndex], MaterialPreset::Matte);
+  Scene glossy_scene = matte_scene;
+  apply_material_preset(glossy_scene.materials[kSphereMaterialIndex], MaterialPreset::Glossy);
+
+  const Camera camera = make_default_camera(1.0f);
+  const RenderSettings settings{16, 16, 0.001f, 1, 1};
+  Renderer matte_renderer;
+  Renderer glossy_renderer;
+  const Image matte = matte_renderer.render(matte_scene, camera, settings);
+  const Image glossy = glossy_renderer.render(glossy_scene, camera, settings);
+
+  EXPECT_GT(image_difference(matte, glossy), 1.0e-5f);
 }
 
 TEST(CpuRenderer, SupportsSixteenAreaLightSamples) {

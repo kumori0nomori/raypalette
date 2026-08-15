@@ -146,10 +146,39 @@ RAYPALETTE_HOST_DEVICE inline Vec3 cosine_sample_direction(const Vec3& normal, f
   return normalized(local.x * tangent + local.y * cross(normal, tangent) + local.z * normal);
 }
 
+RAYPALETTE_HOST_DEVICE inline Vec3 surface_specular_f0(const Material& material) {
+  const float dielectric_f0 = 0.04f * material.specular;
+  const Vec3 dielectric_reflectance{dielectric_f0, dielectric_f0, dielectric_f0};
+  return dielectric_reflectance * (1.0f - material.metallic) +
+         material.base_color * material.metallic;
+}
+
+RAYPALETTE_HOST_DEVICE inline float surface_specular_probability(const Material& material) {
+  if (material.metallic >= 1.0f) {
+    return 1.0f;
+  }
+  const Vec3 f0 = surface_specular_f0(material);
+  const float maximum_f0 = fmaxf(f0.x, fmaxf(f0.y, f0.z));
+  return fminf(0.95f, fmaxf(0.05f, maximum_f0));
+}
+
+RAYPALETTE_HOST_DEVICE inline float surface_specular_pdf(const Ray& ray, const HitRecord& record,
+                                                         const Vec3& direction, float roughness) {
+  const Vec3 view_direction = normalized(-ray.direction);
+  const Vec3 half_vector = normalized(view_direction + direction);
+  const float n_dot_h = fmaxf(0.0f, dot(record.normal, half_vector));
+  const float v_dot_h = fmaxf(0.0f, dot(view_direction, half_vector));
+  return ggx_reflection_pdf(n_dot_h, v_dot_h, roughness);
+}
+
 RAYPALETTE_HOST_DEVICE inline Vec3
-evaluate_diffuse_lighting(const Scene& scene, const HitRecord& record, const Material& material,
-                          float minimum_distance, int light_sample_count, float random_value) {
-  const Vec3 ambient = material.base_color * scene.environment.color * scene.environment.intensity;
+evaluate_diffuse_lighting(const Scene& scene, const Ray& ray, const HitRecord& record,
+                          const Material& material, float minimum_distance, int light_sample_count,
+                          float random_value) {
+  const float diffuse_weight = 1.0f - material.metallic;
+  const Vec3 specular_f0 = surface_specular_f0(material);
+  const Vec3 ambient =
+      material.base_color * diffuse_weight * scene.environment.color * scene.environment.intensity;
   Vec3 direct_light;
   for (int sample_index = 0; sample_index < light_sample_count; ++sample_index) {
     LightSample light_sample;
@@ -157,10 +186,31 @@ evaluate_diffuse_lighting(const Scene& scene, const HitRecord& record, const Mat
       continue;
     const float cosine = fmaxf(0.0f, dot(record.normal, light_sample.direction_to_light));
     if (cosine > 0.0f && visible_to_light(scene, record, light_sample, minimum_distance)) {
-      const float bsdf_pdf = cosine / kPi;
+      const float specular_probability = surface_specular_probability(material);
+      const float diffuse_probability = 1.0f - specular_probability;
+      const float diffuse_pdf = cosine / kPi;
+      float specular_pdf = 0.0f;
+      Vec3 specular_brdf;
+
+      const Vec3 view_direction = normalized(-ray.direction);
+      const Vec3 half_vector = normalized(view_direction + light_sample.direction_to_light);
+      const float n_dot_v = fmaxf(0.0f, dot(record.normal, view_direction));
+      const float n_dot_h = fmaxf(0.0f, dot(record.normal, half_vector));
+      const float v_dot_h = fmaxf(0.0f, dot(view_direction, half_vector));
+      if (n_dot_v > 0.0f && n_dot_h > 0.0f && v_dot_h > 1.0e-6f) {
+        const float distribution = ggx_distribution(n_dot_h, material.roughness);
+        const float geometry = ggx_geometry(n_dot_v, cosine, material.roughness);
+        const Vec3 fresnel = schlick_fresnel(specular_f0, v_dot_h);
+        specular_brdf =
+            fresnel * (distribution * geometry / fmaxf(1.0e-6f, 4.0f * n_dot_v * cosine));
+        specular_pdf = ggx_reflection_pdf(n_dot_h, v_dot_h, material.roughness);
+      }
+      const float mixture_pdf =
+          diffuse_probability * diffuse_pdf + specular_probability * specular_pdf;
       const float mis_weight =
-          light_sample.pdf <= 0.0f ? 1.0f : power_heuristic(light_sample.pdf, bsdf_pdf);
-      direct_light += material.base_color * light_sample.radiance * cosine * mis_weight;
+          light_sample.pdf <= 0.0f ? 1.0f : power_heuristic(light_sample.pdf, mixture_pdf);
+      direct_light += (diffuse_weight * material.base_color + specular_brdf) *
+                      light_sample.radiance * cosine * mis_weight;
     }
   }
   if (scene.light.type == LightType::RectArea)
@@ -173,45 +223,33 @@ evaluate_diffuse_lighting(const Scene& scene, const HitRecord& record, const Mat
       continue;
     const float cosine = fmaxf(0.0f, dot(record.normal, light_sample.direction_to_light));
     if (cosine > 0.0f && visible_to_light(scene, record, light_sample, minimum_distance)) {
-      const float bsdf_pdf = cosine / kPi;
-      const float mis_weight = power_heuristic(light_sample.pdf, bsdf_pdf);
-      emissive_direct_light += material.base_color * light_sample.radiance * cosine * mis_weight;
+      const float specular_probability = surface_specular_probability(material);
+      const float diffuse_probability = 1.0f - specular_probability;
+      const float diffuse_pdf = cosine / kPi;
+      float specular_pdf = 0.0f;
+      Vec3 specular_brdf;
+      const Vec3 view_direction = normalized(-ray.direction);
+      const Vec3 half_vector = normalized(view_direction + light_sample.direction_to_light);
+      const float n_dot_v = fmaxf(0.0f, dot(record.normal, view_direction));
+      const float n_dot_h = fmaxf(0.0f, dot(record.normal, half_vector));
+      const float v_dot_h = fmaxf(0.0f, dot(view_direction, half_vector));
+      if (n_dot_v > 0.0f && n_dot_h > 0.0f && v_dot_h > 1.0e-6f) {
+        const float distribution = ggx_distribution(n_dot_h, material.roughness);
+        const float geometry = ggx_geometry(n_dot_v, cosine, material.roughness);
+        const Vec3 fresnel = schlick_fresnel(specular_f0, v_dot_h);
+        specular_brdf =
+            fresnel * (distribution * geometry / fmaxf(1.0e-6f, 4.0f * n_dot_v * cosine));
+        specular_pdf = ggx_reflection_pdf(n_dot_h, v_dot_h, material.roughness);
+      }
+      const float mixture_pdf =
+          diffuse_probability * diffuse_pdf + specular_probability * specular_pdf;
+      const float mis_weight = power_heuristic(light_sample.pdf, mixture_pdf);
+      emissive_direct_light += (diffuse_weight * material.base_color + specular_brdf) *
+                               light_sample.radiance * cosine * mis_weight;
     }
   }
   emissive_direct_light *= 1.0f / light_sample_count;
   return ambient + direct_light + emissive_direct_light;
-}
-
-RAYPALETTE_HOST_DEVICE inline Vec3
-evaluate_metal_lighting(const Scene& scene, const Ray& ray, const HitRecord& record,
-                        const Material& material, float minimum_distance, int light_sample_count) {
-  const Vec3 view_direction = normalized(-ray.direction);
-  const float n_dot_v = fmaxf(0.0f, dot(record.normal, view_direction));
-  Vec3 direct_reflection;
-  for (int sample_index = 0; sample_index < light_sample_count; ++sample_index) {
-    LightSample light_sample;
-    if (!try_sample_light(scene, record, sample_index, light_sample_count, light_sample))
-      continue;
-    const float n_dot_l = fmaxf(0.0f, dot(record.normal, light_sample.direction_to_light));
-    if (n_dot_l <= 0.0f || n_dot_v <= 0.0f ||
-        !visible_to_light(scene, record, light_sample, minimum_distance))
-      continue;
-    const Vec3 half_vector = normalized(view_direction + light_sample.direction_to_light);
-    const float n_dot_h = fmaxf(0.0f, dot(record.normal, half_vector));
-    const float v_dot_h = fmaxf(0.0f, dot(view_direction, half_vector));
-    const float distribution = ggx_distribution(n_dot_h, material.roughness);
-    const float geometry = ggx_geometry(n_dot_v, n_dot_l, material.roughness);
-    const Vec3 fresnel = schlick_fresnel(material.base_color, v_dot_h);
-    const Vec3 brdf =
-        fresnel * (distribution * geometry / fmaxf(1.0e-6f, 4.0f * n_dot_v * n_dot_l));
-    const float bsdf_pdf = ggx_reflection_pdf(n_dot_h, v_dot_h, material.roughness);
-    const float mis_weight =
-        light_sample.pdf <= 0.0f ? 1.0f : power_heuristic(light_sample.pdf, bsdf_pdf);
-    direct_reflection += light_sample.radiance * brdf * n_dot_l * mis_weight;
-  }
-  if (scene.light.type == LightType::RectArea)
-    direct_reflection *= 1.0f / light_sample_count;
-  return direct_reflection;
 }
 
 RAYPALETTE_HOST_DEVICE inline Vec3 next_diffuse_direction(const HitRecord& record,
@@ -247,15 +285,14 @@ RAYPALETTE_HOST_DEVICE inline void scatter_dielectric(const Ray& ray, const HitR
   }
 }
 
-RAYPALETTE_HOST_DEVICE inline void scatter_metal(const Ray& ray, const HitRecord& record,
-                                                 const Material& material, float random_value,
-                                                 int bounce, Vec3& direction,
-                                                 Vec3& throughput_factor, float& next_random,
-                                                 float& bsdf_pdf) {
+RAYPALETTE_HOST_DEVICE inline void
+scatter_surface_specular(const Ray& ray, const HitRecord& record, const Material& material,
+                         float random_value, int bounce, Vec3& direction, Vec3& throughput_factor,
+                         float& next_random, float& bsdf_pdf, const Vec3& specular_f0) {
   const Vec3 incoming = normalized(ray.direction);
   if (material.roughness <= 0.001f) {
     direction = reflect_direction(incoming, record.normal);
-    throughput_factor = material.base_color;
+    throughput_factor = specular_f0;
     next_random = random_value;
     bsdf_pdf = 0.0f;
     return;
@@ -284,12 +321,12 @@ RAYPALETTE_HOST_DEVICE inline void scatter_metal(const Ray& ray, const HitRecord
   const float v_dot_h = fmaxf(0.0f, dot(view_direction, half_vector));
   if (n_dot_l <= 0.0f || n_dot_v <= 0.0f || n_dot_h <= 0.0f || v_dot_h <= 1.0e-6f) {
     direction = reflect_direction(incoming, record.normal);
-    throughput_factor = material.base_color;
+    throughput_factor = specular_f0;
     bsdf_pdf = 0.0f;
     return;
   }
   const float geometry = ggx_geometry(n_dot_v, n_dot_l, material.roughness);
-  const Vec3 fresnel = schlick_fresnel(material.base_color, v_dot_h);
+  const Vec3 fresnel = schlick_fresnel(specular_f0, v_dot_h);
   throughput_factor = fresnel * (geometry * v_dot_h / fmaxf(1.0e-6f, n_dot_v * n_dot_h));
   bsdf_pdf = ggx_reflection_pdf(n_dot_h, v_dot_h, material.roughness);
 }
@@ -356,37 +393,44 @@ RAYPALETTE_HOST_DEVICE inline Vec3 trace_color(const Scene& scene, const Ray& ra
       resolved_material.base_color = parameters.base_color;
       resolved_material.roughness = parameters.roughness;
       resolved_material.metallic = parameters.metallic;
-      if (parameters.metallic < 0.5f) {
-        path_radiance += throughput * evaluate_diffuse_lighting(scene, record, resolved_material,
-                                                                minimum_distance,
-                                                                light_sample_count, path_random);
-        if (bounce >= max_bounces || !apply_russian_roulette(throughput, path_random, bounce)) {
-          return path_radiance;
-        }
-        const Vec3 scattered_direction =
-            next_diffuse_direction(record, path_random, bounce, path_random);
-        throughput = throughput * resolved_material.base_color;
-        previous_bsdf_pdf = fmaxf(0.0f, dot(record.normal, scattered_direction)) / kPi;
-        previous_scatter_was_delta = false;
-        current_ray = {record.position + minimum_distance * record.normal, scattered_direction};
-      } else {
-        path_radiance +=
-            throughput * evaluate_metal_lighting(scene, current_ray, record, resolved_material,
-                                                 minimum_distance, light_sample_count);
-        if (bounce >= max_bounces || !apply_russian_roulette(throughput, path_random, bounce)) {
-          return path_radiance;
-        }
+      const float specular_probability = surface_specular_probability(resolved_material);
+      const float diffuse_probability = 1.0f - specular_probability;
+      path_radiance +=
+          throughput * evaluate_diffuse_lighting(scene, current_ray, record, resolved_material,
+                                                 minimum_distance, light_sample_count, path_random);
+      if (bounce >= max_bounces || !apply_russian_roulette(throughput, path_random, bounce)) {
+        return path_radiance;
+      }
+
+      if (path_random < specular_probability) {
         Vec3 direction;
         Vec3 throughput_factor;
         float next_random;
-        float bsdf_pdf;
-        scatter_metal(current_ray, record, resolved_material, path_random, bounce, direction,
-                      throughput_factor, next_random, bsdf_pdf);
-        throughput = throughput * throughput_factor;
-        previous_bsdf_pdf = bsdf_pdf;
-        previous_scatter_was_delta = bsdf_pdf <= 0.0f;
+        float specular_pdf;
+        scatter_surface_specular(current_ray, record, resolved_material, path_random, bounce,
+                                 direction, throughput_factor, next_random, specular_pdf,
+                                 surface_specular_f0(resolved_material));
+        const float diffuse_pdf = fmaxf(0.0f, dot(record.normal, direction)) / kPi;
+        const float mixture_pdf =
+            diffuse_probability * diffuse_pdf + specular_probability * specular_pdf;
+        throughput = throughput * throughput_factor / fmaxf(1.0e-6f, specular_probability);
+        previous_bsdf_pdf = mixture_pdf;
+        previous_scatter_was_delta = specular_pdf <= 0.0f;
         current_ray = {record.position + minimum_distance * record.normal, direction};
         path_random = next_random;
+      } else {
+        const Vec3 scattered_direction =
+            next_diffuse_direction(record, path_random, bounce, path_random);
+        const float diffuse_pdf = fmaxf(0.0f, dot(record.normal, scattered_direction)) / kPi;
+        const float specular_pdf = surface_specular_pdf(current_ray, record, scattered_direction,
+                                                        resolved_material.roughness);
+        const float mixture_pdf =
+            diffuse_probability * diffuse_pdf + specular_probability * specular_pdf;
+        throughput =
+            throughput * resolved_material.base_color / fmaxf(1.0e-6f, diffuse_probability);
+        previous_bsdf_pdf = mixture_pdf;
+        previous_scatter_was_delta = false;
+        current_ray = {record.position + minimum_distance * record.normal, scattered_direction};
       }
       continue;
     }
