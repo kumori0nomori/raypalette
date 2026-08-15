@@ -188,7 +188,8 @@ Roughness
 - `Glossy` はPlastic、Lacquer、光沢のあるCeramicに共通する非金属反射面として表示する
 - GlassではGlass tint、IOR、吸収密度を表示する
 - EmissiveではEmission color、Emission strengthを表示する
-- 内部用のmetallic、specular、coat、sheenなどは初期GUIで直接公開しない
+- `Metallic` と `Specular` は `Material details` で表示する
+- 未実装のcoat、sheen、subsurface、anisotropyはGUIに表示しない
 - プリセット選択時は色を保持し、材質特性の標準値を適用する
 - プリセット適用後にroughnessを変更しても、選択中のプリセット名は維持する
 - `Reset preset values` は必要になった時点で追加する
@@ -216,10 +217,12 @@ Hair、Skin、Clothをbackend実装前に表示する場合は、名前だけで
 
 ### Phase 3: 基本プリセットとGUI
 
-- Matte、Glossy、Metalを追加する
-- Surface typeとSurface presetの2段Comboへ変更する
-- 共通Color/Roughness UIへ整理する
-- 既存Glass/Emissionの操作を維持する
+- [x] Matte、Glossy、Metalを追加する
+- [x] Surface typeとSurface presetの2段Comboへ変更する
+- [x] 共通Color/Roughness UIへ整理する
+- [x] Material detailsにMetallic/Specularを追加する
+- [x] プリセット値のリセット操作を追加する
+- [x] 既存Glass/Emissionの操作を維持する
 
 ### Phase 4: Cloth、Skin
 

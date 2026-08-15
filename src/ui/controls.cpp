@@ -194,6 +194,19 @@ void draw_controls(ControlsContext& context) {
       if (ImGui::SliderFloat("Roughness", &sphere_material.roughness, 0.0f, 1.0f)) {
         context.request_render();
       }
+      if (ImGui::CollapsingHeader("Material details")) {
+        bool details_changed = false;
+        details_changed |= ImGui::SliderFloat("Metallic", &sphere_material.metallic, 0.0f, 1.0f);
+        details_changed |= ImGui::SliderFloat("Specular", &sphere_material.specular, 0.0f, 1.0f);
+        if (details_changed) {
+          context.request_render();
+        }
+      }
+      if (sphere_material.preset != MaterialPreset::Custom &&
+          ImGui::Button("Reset preset values")) {
+        apply_material_preset(sphere_material, sphere_material.preset);
+        context.request_render();
+      }
     } else if (sphere_material.type == MaterialType::Dielectric) {
       if (ImGui::ColorEdit3("Glass tint", &sphere_material.transmission_color.x,
                             ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs)) {
