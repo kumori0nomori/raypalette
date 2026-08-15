@@ -198,6 +198,7 @@ void draw_controls(ControlsContext& context) {
         bool details_changed = false;
         details_changed |= ImGui::SliderFloat("Metallic", &sphere_material.metallic, 0.0f, 1.0f);
         details_changed |= ImGui::SliderFloat("Specular", &sphere_material.specular, 0.0f, 1.0f);
+        details_changed |= ImGui::SliderFloat("Sheen", &sphere_material.sheen, 0.0f, 1.0f);
         if (details_changed) {
           context.request_render();
         }

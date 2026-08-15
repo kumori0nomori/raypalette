@@ -67,6 +67,23 @@ TEST(CpuRenderer, SurfacePresetsChangeDirectLighting) {
   EXPECT_GT(image_difference(matte, glossy), 1.0e-5f);
 }
 
+TEST(CpuRenderer, ClothSheenChangesDirectLighting) {
+  Scene matte_scene = make_default_scene();
+  apply_material_preset(matte_scene.materials[kSphereMaterialIndex], MaterialPreset::Matte);
+  matte_scene.materials[kSphereMaterialIndex].roughness = 0.8f;
+  Scene cloth_scene = matte_scene;
+  apply_material_preset(cloth_scene.materials[kSphereMaterialIndex], MaterialPreset::Cloth);
+
+  const Camera camera = make_default_camera(1.0f);
+  const RenderSettings settings{16, 16, 0.001f, 1, 1};
+  Renderer matte_renderer;
+  Renderer cloth_renderer;
+  const Image matte = matte_renderer.render(matte_scene, camera, settings);
+  const Image cloth = cloth_renderer.render(cloth_scene, camera, settings);
+
+  EXPECT_GT(image_difference(matte, cloth), 1.0e-5f);
+}
+
 TEST(CpuRenderer, SupportsSixteenAreaLightSamples) {
   Scene scene = make_default_scene();
   scene.light = make_rect_area_light({4.0f, 35.0f, 45.0f}, scene.sphere.center, {0.0f, -1.0f, 0.0f},
