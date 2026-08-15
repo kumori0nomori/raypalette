@@ -29,8 +29,12 @@ RAYPALETTE_HOST_DEVICE inline float sample_unit(unsigned int pixel_index, unsign
   return static_cast<float>(sample_hash(seed) & 0x00ffffffU) / 16777216.0f;
 }
 
-constexpr int kMaxLightSampleCount = 4;
+constexpr int kMaxLightSampleCount = 16;
 constexpr float kPi = 3.14159265358979323846f;
+
+RAYPALETTE_HOST_DEVICE constexpr int sample_count_to_grid_size(int sample_count) {
+  return sample_count >= 16 ? 4 : sample_count >= 9 ? 3 : sample_count >= 4 ? 2 : 1;
+}
 
 RAYPALETTE_HOST_DEVICE inline bool hit_scene(const Scene& scene, const Ray& ray,
                                              float minimum_distance, float maximum_distance,
@@ -77,13 +81,16 @@ RAYPALETTE_HOST_DEVICE inline bool visible_to_light(const Scene& scene, const Hi
 }
 
 RAYPALETTE_HOST_DEVICE inline bool try_sample_light(const Scene& scene, const HitRecord& record,
-                                                    int sample_index, LightSample& sample) {
+                                                    int sample_index, int light_sample_count,
+                                                    LightSample& sample) {
   switch (scene.light.type) {
   case LightType::RectArea: {
-    const int sample_x = sample_index % 2;
-    const int sample_y = sample_index / 2;
-    const float sample_u = (static_cast<float>(sample_x) + 0.5f) * 0.5f - 0.5f;
-    const float sample_v = (static_cast<float>(sample_y) + 0.5f) * 0.5f - 0.5f;
+    const int grid_size = sample_count_to_grid_size(light_sample_count);
+    const int sample_x = sample_index % grid_size;
+    const int sample_y = sample_index / grid_size;
+    const float cell_size = 1.0f / static_cast<float>(grid_size);
+    const float sample_u = (static_cast<float>(sample_x) + 0.5f) * cell_size - 0.5f;
+    const float sample_v = (static_cast<float>(sample_y) + 0.5f) * cell_size - 0.5f;
     return sample_area_light(scene.light, record.position, sample_u, sample_v, sample);
   }
   case LightType::Point:
@@ -146,7 +153,7 @@ evaluate_diffuse_lighting(const Scene& scene, const HitRecord& record, const Mat
   Vec3 direct_light;
   for (int sample_index = 0; sample_index < light_sample_count; ++sample_index) {
     LightSample light_sample;
-    if (!try_sample_light(scene, record, sample_index, light_sample))
+    if (!try_sample_light(scene, record, sample_index, light_sample_count, light_sample))
       continue;
     const float cosine = fmaxf(0.0f, dot(record.normal, light_sample.direction_to_light));
     if (cosine > 0.0f && visible_to_light(scene, record, light_sample, minimum_distance)) {
@@ -183,7 +190,7 @@ evaluate_metal_lighting(const Scene& scene, const Ray& ray, const HitRecord& rec
   Vec3 direct_reflection;
   for (int sample_index = 0; sample_index < light_sample_count; ++sample_index) {
     LightSample light_sample;
-    if (!try_sample_light(scene, record, sample_index, light_sample))
+    if (!try_sample_light(scene, record, sample_index, light_sample_count, light_sample))
       continue;
     const float n_dot_l = fmaxf(0.0f, dot(record.normal, light_sample.direction_to_light));
     if (n_dot_l <= 0.0f || n_dot_v <= 0.0f ||

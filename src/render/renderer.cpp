@@ -6,6 +6,14 @@
 
 namespace raypalette {
 
+namespace {
+
+bool is_supported_light_sample_count(int sample_count) {
+  return sample_count == 1 || sample_count == 4 || sample_count == 9 || sample_count == 16;
+}
+
+} // namespace
+
 #ifdef RAYPALETTE_CUDA_BACKEND
 bool cuda_backend_available();
 std::string cuda_backend_name();
@@ -23,6 +31,7 @@ Image Renderer::render(const Scene& scene, const Camera& camera, const RenderSet
   if (settings.width <= 0 || settings.height <= 0 || settings.samples_per_pixel <= 0 ||
       settings.samples_per_pixel > 16 || settings.light_samples_per_frame <= 0 ||
       settings.light_samples_per_frame > detail::kMaxLightSampleCount ||
+      !is_supported_light_sample_count(settings.light_samples_per_frame) ||
       settings.target_samples_per_pixel <= 0 || settings.max_bounces < 0 ||
       !is_valid_scene(scene)) {
     throw std::invalid_argument("invalid scene or render settings");

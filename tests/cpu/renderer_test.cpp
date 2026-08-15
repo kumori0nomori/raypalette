@@ -28,6 +28,18 @@ TEST(CpuRenderer, RendersFiniteCanonicalImage) {
   EXPECT_TRUE(image_is_finite(image));
 }
 
+TEST(CpuRenderer, SupportsSixteenAreaLightSamples) {
+  Scene scene = make_default_scene();
+  scene.light = make_rect_area_light({4.0f, 35.0f, 45.0f}, scene.sphere.center, {0.0f, -1.0f, 0.0f},
+                                     1.0f, 1.0f, {1.0f, 1.0f, 1.0f}, 100.0f);
+  RenderSettings settings{8, 8, 0.001f, 1, 16, 1, 2};
+  Renderer renderer;
+
+  const Image image = renderer.render(scene, make_default_camera(1.0f), settings);
+
+  EXPECT_TRUE(image_is_finite(image));
+}
+
 TEST(RendererBackend, UsesCpuByDefaultAndReportsBackendAvailability) {
   Renderer renderer;
 

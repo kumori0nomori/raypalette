@@ -11,6 +11,29 @@ namespace raypalette::ui {
 namespace {
 
 constexpr const char* kMaterialLabels[] = {"Diffuse", "Metal", "Glass", "Emissive"};
+constexpr const char* kAreaLightSampleLabels[] = {"4 (2x2)", "9 (3x3)", "16 (4x4)"};
+
+int area_light_sample_index(int sample_count) {
+  switch (sample_count) {
+  case 9:
+    return 1;
+  case 16:
+    return 2;
+  default:
+    return 0;
+  }
+}
+
+int area_light_sample_count(int index) {
+  switch (index) {
+  case 1:
+    return 9;
+  case 2:
+    return 16;
+  default:
+    return 4;
+  }
+}
 
 } // namespace
 
@@ -147,7 +170,7 @@ void draw_controls(ControlsContext& context) {
       context.request_render();
     }
     if (sphere_material.type == MaterialType::Dielectric) {
-      if (ImGui::ColorEdit3("Glass transmission", &sphere_material.transmission_color.x,
+      if (ImGui::ColorEdit3("Glass tint", &sphere_material.transmission_color.x,
                             ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs)) {
         sphere_material.transmission_color.x = std::max(0.0f, sphere_material.transmission_color.x);
         sphere_material.transmission_color.y = std::max(0.0f, sphere_material.transmission_color.y);
@@ -155,14 +178,14 @@ void draw_controls(ControlsContext& context) {
         context.request_render();
       }
     } else if (sphere_material.type == MaterialType::Emissive) {
-      if (ImGui::ColorEdit3("Sphere emission", &sphere_material.emission_color.x,
+      if (ImGui::ColorEdit3("Emission color", &sphere_material.emission_color.x,
                             ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs)) {
         sphere_material.emission_color.x = std::max(0.0f, sphere_material.emission_color.x);
         sphere_material.emission_color.y = std::max(0.0f, sphere_material.emission_color.y);
         sphere_material.emission_color.z = std::max(0.0f, sphere_material.emission_color.z);
         context.request_render();
       }
-    } else if (ImGui::ColorEdit3("Sphere color", &sphere_material.base_color.x,
+    } else if (ImGui::ColorEdit3("Color", &sphere_material.base_color.x,
                                  ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs)) {
       context.request_render();
     }
@@ -190,8 +213,7 @@ void draw_controls(ControlsContext& context) {
       ImGui::Text("IOR %.3f", sphere_material.index_of_refraction);
     }
     if (sphere_material.type == MaterialType::Emissive &&
-        ImGui::SliderFloat("Sphere emission strength", &sphere_material.emission_strength, 0.0f,
-                           10.0f)) {
+        ImGui::SliderFloat("Emission strength", &sphere_material.emission_strength, 0.0f, 10.0f)) {
       context.request_render();
     }
     if (ImGui::ColorEdit3("Floor color", &context.scene.materials[kFloorMaterialIndex].base_color.x,
@@ -243,6 +265,14 @@ void draw_controls(ControlsContext& context) {
         context.scene.light.area.height = area_size;
         context.request_render();
       }
+      int area_light_sample_index_value =
+          area_light_sample_index(context.settings.light_samples_per_frame);
+      if (ImGui::Combo("Area light samples", &area_light_sample_index_value, kAreaLightSampleLabels,
+                       IM_ARRAYSIZE(kAreaLightSampleLabels))) {
+        context.settings.light_samples_per_frame =
+            area_light_sample_count(area_light_sample_index_value);
+        context.request_render();
+      }
     }
     bool light_parameters_changed = false;
     if (context.scene.light.type != LightType::Directional) {
@@ -255,9 +285,6 @@ void draw_controls(ControlsContext& context) {
         ImGui::SliderFloat("Light theta", &context.light_polar.theta_degrees, 0.0f, 90.0f);
     light_parameters_changed |=
         ImGui::SliderFloat("Light phi", &context.light_polar.phi_degrees, -180.0f, 180.0f);
-    if (context.scene.light.type == LightType::RectArea) {
-      ImGui::TextDisabled("4 deterministic area-light samples.");
-    }
     if (light_parameters_changed) {
       const Vec3 color = light_color(context.scene.light);
       const float energy = light_energy(context.scene.light);
@@ -307,10 +334,7 @@ void draw_controls(ControlsContext& context) {
       }
     }
     ImGui::EndDisabled();
-    if (ImGui::SliderInt("Samples per pixel", &context.settings.samples_per_pixel, 1, 4)) {
-      context.request_render();
-    }
-    if (ImGui::SliderInt("Light samples", &context.settings.light_samples_per_frame, 1, 4)) {
+    if (ImGui::SliderInt("Samples per pixel", &context.settings.samples_per_pixel, 1, 16)) {
       context.request_render();
     }
     if (ImGui::SliderInt("Target samples", &context.settings.target_samples_per_pixel, 1, 256)) {
