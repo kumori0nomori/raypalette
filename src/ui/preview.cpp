@@ -30,15 +30,9 @@ void draw_preview(PreviewContext& context) {
         const Vec3 picked_color =
             context.texture.display_pixels[pixel_y * context.image.width + pixel_x];
         if (context.gui_state.palette.size() < kMaximumPaletteColors) {
-          bool already_added = false;
-          for (const PaletteColor& entry : context.gui_state.palette) {
-            already_added = already_added || same_palette_color(entry.color, picked_color);
-          }
-          if (!already_added) {
-            context.gui_state.palette.push_back({picked_color, color_to_hex(picked_color), u, v});
-            context.gui_state.selected_palette_index =
-                static_cast<int>(context.gui_state.palette.size()) - 1;
-          }
+          context.gui_state.palette.push_back({picked_color, color_to_hex(picked_color), u, v});
+          context.gui_state.selected_palette_index =
+              static_cast<int>(context.gui_state.palette.size()) - 1;
         }
       }
     }
