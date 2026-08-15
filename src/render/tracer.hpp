@@ -350,38 +350,44 @@ RAYPALETTE_HOST_DEVICE inline Vec3 trace_color(const Scene& scene, const Ray& ra
     if (material.type == MaterialType::Emissive)
       break;
     switch (material.type) {
-    case MaterialType::Diffuse: {
-      path_radiance +=
-          throughput * evaluate_diffuse_lighting(scene, record, material, minimum_distance,
-                                                 light_sample_count, path_random);
-      if (bounce >= max_bounces || !apply_russian_roulette(throughput, path_random, bounce)) {
-        return path_radiance;
+    case MaterialType::Surface: {
+      const PrincipledParameters parameters = resolve_principled_parameters(material);
+      Material resolved_material = material;
+      resolved_material.base_color = parameters.base_color;
+      resolved_material.roughness = parameters.roughness;
+      resolved_material.metallic = parameters.metallic;
+      if (parameters.metallic < 0.5f) {
+        path_radiance += throughput * evaluate_diffuse_lighting(scene, record, resolved_material,
+                                                                minimum_distance,
+                                                                light_sample_count, path_random);
+        if (bounce >= max_bounces || !apply_russian_roulette(throughput, path_random, bounce)) {
+          return path_radiance;
+        }
+        const Vec3 scattered_direction =
+            next_diffuse_direction(record, path_random, bounce, path_random);
+        throughput = throughput * resolved_material.base_color;
+        previous_bsdf_pdf = fmaxf(0.0f, dot(record.normal, scattered_direction)) / kPi;
+        previous_scatter_was_delta = false;
+        current_ray = {record.position + minimum_distance * record.normal, scattered_direction};
+      } else {
+        path_radiance +=
+            throughput * evaluate_metal_lighting(scene, current_ray, record, resolved_material,
+                                                 minimum_distance, light_sample_count);
+        if (bounce >= max_bounces || !apply_russian_roulette(throughput, path_random, bounce)) {
+          return path_radiance;
+        }
+        Vec3 direction;
+        Vec3 throughput_factor;
+        float next_random;
+        float bsdf_pdf;
+        scatter_metal(current_ray, record, resolved_material, path_random, bounce, direction,
+                      throughput_factor, next_random, bsdf_pdf);
+        throughput = throughput * throughput_factor;
+        previous_bsdf_pdf = bsdf_pdf;
+        previous_scatter_was_delta = bsdf_pdf <= 0.0f;
+        current_ray = {record.position + minimum_distance * record.normal, direction};
+        path_random = next_random;
       }
-      const Vec3 scattered_direction =
-          next_diffuse_direction(record, path_random, bounce, path_random);
-      throughput = throughput * material.base_color;
-      previous_bsdf_pdf = fmaxf(0.0f, dot(record.normal, scattered_direction)) / kPi;
-      previous_scatter_was_delta = false;
-      current_ray = {record.position + minimum_distance * record.normal, scattered_direction};
-      continue;
-    }
-    case MaterialType::Metal: {
-      path_radiance += throughput * evaluate_metal_lighting(scene, current_ray, record, material,
-                                                            minimum_distance, light_sample_count);
-      if (bounce >= max_bounces || !apply_russian_roulette(throughput, path_random, bounce)) {
-        return path_radiance;
-      }
-      Vec3 direction;
-      Vec3 throughput_factor;
-      float next_random;
-      float bsdf_pdf;
-      scatter_metal(current_ray, record, material, path_random, bounce, direction,
-                    throughput_factor, next_random, bsdf_pdf);
-      throughput = throughput * throughput_factor;
-      previous_bsdf_pdf = bsdf_pdf;
-      previous_scatter_was_delta = bsdf_pdf <= 0.0f;
-      current_ray = {record.position + minimum_distance * record.normal, direction};
-      path_random = next_random;
       continue;
     }
     case MaterialType::Dielectric: {

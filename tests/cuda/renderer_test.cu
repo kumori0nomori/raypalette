@@ -167,7 +167,7 @@ TEST(CudaRenderer, ReflectsEnvironmentThroughMetalSphere) {
   }
   Scene scene = make_default_scene();
   Material &sphere_material = scene.materials[kSphereMaterialIndex];
-  sphere_material.type = MaterialType::Metal;
+  apply_material_preset(sphere_material, MaterialPreset::Metal);
   sphere_material.base_color = {0.8f, 0.6f, 0.4f};
   scene.environment.intensity = 0.0f;
   scene.light.point.radiant_intensity = 0.0f;

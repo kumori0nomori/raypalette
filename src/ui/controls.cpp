@@ -10,7 +10,9 @@ namespace raypalette::ui {
 
 namespace {
 
-constexpr const char* kMaterialLabels[] = {"Diffuse", "Metal", "Glass", "Emissive"};
+constexpr const char* kMaterialLabels[] = {"Surface", "Glass", "Emissive"};
+constexpr const char* kMaterialPresetLabels[] = {"Custom", "Matte", "Glossy", "Metal",
+                                                 "Cloth",  "Skin",  "Hair"};
 constexpr const char* kAreaLightSampleLabels[] = {"4 (2x2)", "9 (3x3)", "16 (4x4)"};
 
 int area_light_sample_index(int sample_count) {
@@ -75,14 +77,12 @@ LightEnergyUi light_energy_ui(LightType type) {
 
 int material_type_index(MaterialType type) {
   switch (type) {
-  case MaterialType::Diffuse:
+  case MaterialType::Surface:
     return 0;
-  case MaterialType::Metal:
-    return 1;
   case MaterialType::Dielectric:
-    return 2;
+    return 1;
   case MaterialType::Emissive:
-    return 3;
+    return 2;
   }
   return 0;
 }
@@ -90,14 +90,23 @@ int material_type_index(MaterialType type) {
 MaterialType material_type_from_index(int index) {
   switch (index) {
   case 1:
-    return MaterialType::Metal;
-  case 2:
     return MaterialType::Dielectric;
-  case 3:
+  case 2:
     return MaterialType::Emissive;
   default:
-    return MaterialType::Diffuse;
+    return MaterialType::Surface;
   }
+}
+
+int material_preset_index(MaterialPreset preset) {
+  return static_cast<int>(preset);
+}
+
+MaterialPreset material_preset_from_index(int index) {
+  if (index < 0 || index > static_cast<int>(MaterialPreset::Hair)) {
+    return MaterialPreset::Custom;
+  }
+  return static_cast<MaterialPreset>(index);
 }
 
 Vec3 sphere_material_color(const Material& material) {
@@ -106,8 +115,7 @@ Vec3 sphere_material_color(const Material& material) {
     return material.transmission_color;
   case MaterialType::Emissive:
     return material.emission_color;
-  case MaterialType::Diffuse:
-  case MaterialType::Metal:
+  case MaterialType::Surface:
     return material.base_color;
   }
   return material.base_color;
@@ -147,7 +155,7 @@ void draw_controls(ControlsContext& context) {
     Material& sphere_material = context.scene.materials[kSphereMaterialIndex];
     int sphere_material_index = material_type_index(sphere_material.type);
     if (ImGui::Combo("Sphere material", &sphere_material_index, kMaterialLabels,
-                     static_cast<int>(std::size(kMaterialLabels)))) {
+                     IM_ARRAYSIZE(kMaterialLabels))) {
       const MaterialType previous_type = sphere_material.type;
       const MaterialType next_type = material_type_from_index(sphere_material_index);
       if (next_type == MaterialType::Dielectric && previous_type != MaterialType::Dielectric) {
@@ -167,9 +175,26 @@ void draw_controls(ControlsContext& context) {
         sphere_material.base_color = sphere_material.emission_color;
       }
       sphere_material.type = next_type;
+      if (next_type == MaterialType::Surface && previous_type != MaterialType::Surface) {
+        sphere_material.preset = MaterialPreset::Custom;
+      }
       context.request_render();
     }
-    if (sphere_material.type == MaterialType::Dielectric) {
+    if (sphere_material.type == MaterialType::Surface) {
+      int preset_index = material_preset_index(sphere_material.preset);
+      if (ImGui::Combo("Surface preset", &preset_index, kMaterialPresetLabels,
+                       IM_ARRAYSIZE(kMaterialPresetLabels))) {
+        apply_material_preset(sphere_material, material_preset_from_index(preset_index));
+        context.request_render();
+      }
+      if (ImGui::ColorEdit3("Color", &sphere_material.base_color.x,
+                            ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs)) {
+        context.request_render();
+      }
+      if (ImGui::SliderFloat("Roughness", &sphere_material.roughness, 0.0f, 1.0f)) {
+        context.request_render();
+      }
+    } else if (sphere_material.type == MaterialType::Dielectric) {
       if (ImGui::ColorEdit3("Glass tint", &sphere_material.transmission_color.x,
                             ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs)) {
         sphere_material.transmission_color.x = std::max(0.0f, sphere_material.transmission_color.x);
@@ -187,13 +212,6 @@ void draw_controls(ControlsContext& context) {
         sphere_material.emission_color.z = std::max(0.0f, sphere_material.emission_color.z);
         context.request_render();
       }
-    } else if (ImGui::ColorEdit3("Color", &sphere_material.base_color.x,
-                                 ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs)) {
-      context.request_render();
-    }
-    if (sphere_material.type == MaterialType::Metal &&
-        ImGui::SliderFloat("Metal roughness", &sphere_material.roughness, 0.0f, 1.0f)) {
-      context.request_render();
     }
     if (sphere_material.type == MaterialType::Dielectric) {
       if (ImGui::SliderFloat("Glass absorption density", &sphere_material.absorption_density, 0.0f,

@@ -28,6 +28,19 @@ TEST(CpuRenderer, RendersFiniteCanonicalImage) {
   EXPECT_TRUE(image_is_finite(image));
 }
 
+TEST(CpuRenderer, RendersFiniteSurfacePresets) {
+  const MaterialPreset presets[] = {
+      MaterialPreset::Custom, MaterialPreset::Matte, MaterialPreset::Glossy, MaterialPreset::Metal,
+      MaterialPreset::Cloth,  MaterialPreset::Skin,  MaterialPreset::Hair};
+  Renderer renderer;
+  for (const MaterialPreset preset : presets) {
+    Scene scene = make_default_scene();
+    apply_material_preset(scene.materials[kSphereMaterialIndex], preset);
+    const Image image = renderer.render(scene, make_default_camera(1.0f), {4, 4, 0.001f, 1, 1});
+    EXPECT_TRUE(image_is_finite(image));
+  }
+}
+
 TEST(CpuRenderer, SupportsSixteenAreaLightSamples) {
   Scene scene = make_default_scene();
   scene.light = make_rect_area_light({4.0f, 35.0f, 45.0f}, scene.sphere.center, {0.0f, -1.0f, 0.0f},

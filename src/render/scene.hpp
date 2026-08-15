@@ -33,9 +33,12 @@ RAYPALETTE_HOST_DEVICE inline bool is_valid_scene(const Scene& scene) {
 inline Scene make_default_scene() {
   const Vec3 sphere_center{0.0f, 1.0f, 0.0f};
   const PolarCoordinates light_polar{4.0f, 35.0f, 45.0f};
+  Material sphere_material;
+  sphere_material.base_color = {0.8f, 0.2f, 0.1f};
+  Material floor_material;
+  floor_material.base_color = {0.5f, 0.5f, 0.5f};
 
-  return {{{MaterialType::Diffuse, {0.8f, 0.2f, 0.1f}, 0.5f, 1.5f, {}, 0.0f},
-           {MaterialType::Diffuse, {0.5f, 0.5f, 0.5f}, 0.5f, 1.5f, {}, 0.0f}},
+  return {{sphere_material, floor_material},
           {sphere_center, 1.0f, kSphereMaterialIndex},
           {{0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, kFloorMaterialIndex},
           make_point_light(light_polar, sphere_center, {1.0f, 1.0f, 1.0f}, 100.0f),

@@ -13,6 +13,24 @@ TEST(Material, AcceptsDefaultDiffuseMaterial) {
   EXPECT_TRUE(is_valid_material({}));
 }
 
+TEST(Material, ResolvesSurfacePresets) {
+  Material material;
+  apply_material_preset(material, MaterialPreset::Metal);
+  material.roughness = 0.2f;
+  PrincipledParameters metal = resolve_principled_parameters(material);
+  EXPECT_FLOAT_EQ(metal.metallic, 1.0f);
+  EXPECT_FLOAT_EQ(metal.roughness, 0.2f);
+
+  apply_material_preset(material, MaterialPreset::Glossy);
+  const PrincipledParameters glossy = resolve_principled_parameters(material);
+  EXPECT_FLOAT_EQ(glossy.metallic, 0.0f);
+  EXPECT_FLOAT_EQ(glossy.roughness, 0.28f);
+
+  apply_material_preset(material, MaterialPreset::Cloth);
+  const PrincipledParameters cloth = resolve_principled_parameters(material);
+  EXPECT_FLOAT_EQ(cloth.sheen, 0.6f);
+}
+
 TEST(Material, RejectsInvalidPhysicalParameters) {
   Material invalid_color;
   invalid_color.base_color = {1.1f, 0.0f, 0.0f};
