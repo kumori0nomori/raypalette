@@ -27,7 +27,8 @@ public:
           const float v = (static_cast<float>(y) + subpixel_y) / settings.height;
           accumulated_color += detail::trace_color(
               scene, camera_ray(camera, u, v), settings.minimum_distance, 0, settings.max_bounces,
-              fresnel_random, settings.light_samples_per_frame);
+              fresnel_random, settings.area_light_samples_per_frame,
+              settings.emissive_light_samples_per_frame);
         }
         frame_pixels[static_cast<std::size_t>(y) * settings.width + x] =
             accumulated_color * (1.0f / samples_this_frame);

@@ -8,8 +8,12 @@ namespace raypalette {
 
 namespace {
 
-bool is_supported_light_sample_count(int sample_count) {
+bool is_supported_area_light_sample_count(int sample_count) {
   return sample_count == 1 || sample_count == 4 || sample_count == 9 || sample_count == 16;
+}
+
+bool is_supported_emissive_light_sample_count(int sample_count) {
+  return sample_count >= 1 && sample_count <= detail::kMaxLightSampleCount;
 }
 
 } // namespace
@@ -29,9 +33,12 @@ Renderer& Renderer::operator=(Renderer&&) noexcept = default;
 
 Image Renderer::render(const Scene& scene, const Camera& camera, const RenderSettings& settings) {
   if (settings.width <= 0 || settings.height <= 0 || settings.samples_per_pixel <= 0 ||
-      settings.samples_per_pixel > 16 || settings.light_samples_per_frame <= 0 ||
-      settings.light_samples_per_frame > detail::kMaxLightSampleCount ||
-      !is_supported_light_sample_count(settings.light_samples_per_frame) ||
+      settings.samples_per_pixel > 16 || settings.area_light_samples_per_frame <= 0 ||
+      settings.area_light_samples_per_frame > detail::kMaxLightSampleCount ||
+      !is_supported_area_light_sample_count(settings.area_light_samples_per_frame) ||
+      settings.emissive_light_samples_per_frame <= 0 ||
+      settings.emissive_light_samples_per_frame > detail::kMaxLightSampleCount ||
+      !is_supported_emissive_light_sample_count(settings.emissive_light_samples_per_frame) ||
       settings.target_samples_per_pixel <= 0 || settings.max_bounces < 0 ||
       !is_valid_scene(scene)) {
     throw std::invalid_argument("invalid scene or render settings");

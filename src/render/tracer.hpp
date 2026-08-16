@@ -140,13 +140,14 @@ RAYPALETTE_HOST_DEVICE inline Vec3 cosine_sample_direction(const Vec3& normal, f
   return normalized(local.x * tangent + local.y * cross(normal, tangent) + local.z * normal);
 }
 
-// Return the accumulated radiance from the scene light sources and environment at the intersection point
-// for a surface material, taking into account the material properties and light sampling.
+// Return the accumulated radiance from the scene light sources and environment at the intersection
+// point for a surface material, taking into account the material properties and light sampling.
 //  L_surface = L_ambient + L_direct + L_emissive
 RAYPALETTE_HOST_DEVICE inline Vec3
 evaluate_surface_lighting(const Scene& scene, const Ray& ray, const HitRecord& record,
                           const PrincipledParameters& material, float minimum_distance,
-                          int light_sample_count, float random_value) {
+                          int area_light_sample_count, int emissive_light_sample_count,
+                          float random_value) {
   // 1. Compute the ambient lighting contribution from the environment light.
   const float diffuse_weight = 1.0f - material.metallic;
   const Vec3 ambient =
@@ -154,12 +155,12 @@ evaluate_surface_lighting(const Scene& scene, const Ray& ray, const HitRecord& r
 
   // 2. Compute the direct lighting contribution from the scene light sources.
   Vec3 direct_light;
-  for (int sample_index = 0; sample_index < light_sample_count; ++sample_index) {
+  for (int sample_index = 0; sample_index < area_light_sample_count; ++sample_index) {
     // Select light samples according to the light type:
     // - Point/Directional lights: only the first sample is valid
     // - Area lights: light_sample_count samples are valid
     LightSample light_sample;
-    if (!try_sample_light(scene, record, sample_index, light_sample_count, light_sample))
+    if (!try_sample_light(scene, record, sample_index, area_light_sample_count, light_sample))
       continue;
 
     // Check if the intersection point is visible to the light source,
@@ -171,11 +172,11 @@ evaluate_surface_lighting(const Scene& scene, const Ray& ray, const HitRecord& r
   // Average the direct light for samples of area lights.
   // L_direct = (1 / N) * sum(L_direct_i) for i = 1 to N, where N is the number of samples.
   if (scene.light.type == LightType::RectArea)
-    direct_light *= 1.0f / light_sample_count;
+    direct_light *= 1.0f / area_light_sample_count;
 
   // 3. Compute the direct lighting contribution from the emissive sphere in the scene.
   Vec3 emissive_direct_light;
-  for (int sample_index = 0; sample_index < light_sample_count; ++sample_index) {
+  for (int sample_index = 0; sample_index < emissive_light_sample_count; ++sample_index) {
     LightSample light_sample;
     if (!try_sample_emissive_sphere(scene, record, sample_index, random_value, light_sample))
       continue;
@@ -183,7 +184,7 @@ evaluate_surface_lighting(const Scene& scene, const Ray& ray, const HitRecord& r
       emissive_direct_light += evaluate_surface_light_sample(ray, record, material, light_sample);
     }
   }
-  emissive_direct_light *= 1.0f / light_sample_count;
+  emissive_direct_light *= 1.0f / emissive_light_sample_count;
   return ambient + direct_light + emissive_direct_light;
 }
 
@@ -343,7 +344,8 @@ RAYPALETTE_HOST_DEVICE inline bool apply_russian_roulette(Vec3& throughput, floa
 RAYPALETTE_HOST_DEVICE inline Vec3 trace_color(const Scene& scene, const Ray& ray,
                                                float minimum_distance, int bounce_count,
                                                int max_bounces, float random_value,
-                                               int light_sample_count) {
+                                               int area_light_sample_count,
+                                               int emissive_light_sample_count) {
   Ray current_ray = ray;
   Vec3 throughput{1.0f, 1.0f, 1.0f};
   Vec3 path_radiance;
@@ -378,7 +380,8 @@ RAYPALETTE_HOST_DEVICE inline Vec3 trace_color(const Scene& scene, const Ray& ra
       const PrincipledParameters parameters = resolve_principled_parameters(material);
       path_radiance +=
           throughput * evaluate_surface_lighting(scene, current_ray, record, parameters,
-                                                 minimum_distance, light_sample_count, path_random);
+                                                 minimum_distance, area_light_sample_count,
+                                                 emissive_light_sample_count, path_random);
       if (bounce >= max_bounces || !apply_russian_roulette(throughput, path_random, bounce)) {
         return path_radiance;
       }

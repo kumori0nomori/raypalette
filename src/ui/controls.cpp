@@ -323,10 +323,10 @@ void draw_controls(ControlsContext& context) {
         context.request_render();
       }
       int area_light_sample_index_value =
-          area_light_sample_index(context.settings.light_samples_per_frame);
+          area_light_sample_index(context.settings.area_light_samples_per_frame);
       if (ImGui::Combo("Area light samples", &area_light_sample_index_value, kAreaLightSampleLabels,
                        IM_ARRAYSIZE(kAreaLightSampleLabels))) {
-        context.settings.light_samples_per_frame =
+        context.settings.area_light_samples_per_frame =
             area_light_sample_count(area_light_sample_index_value);
         context.request_render();
       }

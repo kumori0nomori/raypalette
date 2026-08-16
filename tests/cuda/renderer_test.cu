@@ -14,18 +14,17 @@ bool has_cuda_device() {
   return error == cudaSuccess && device_count > 0;
 }
 
-float image_mean_luminance(const Image &image) {
+float image_mean_luminance(const Image& image) {
   float total = 0.0f;
-  for (const Vec3 &pixel : image.pixels) {
+  for (const Vec3& pixel : image.pixels) {
     total += 0.2126f * pixel.x + 0.7152f * pixel.y + 0.0722f * pixel.z;
   }
   return total / static_cast<float>(image.pixels.size());
 }
 
-bool image_is_finite(const Image &image) {
-  for (const Vec3 &pixel : image.pixels) {
-    if (!std::isfinite(pixel.x) || !std::isfinite(pixel.y) ||
-        !std::isfinite(pixel.z)) {
+bool image_is_finite(const Image& image) {
+  for (const Vec3& pixel : image.pixels) {
+    if (!std::isfinite(pixel.x) || !std::isfinite(pixel.y) || !std::isfinite(pixel.z)) {
       return false;
     }
   }
@@ -51,7 +50,7 @@ TEST(RendererBackend, SwitchingBackendResetsAccumulation) {
   }
 
   Renderer renderer;
-  const RenderSettings settings{4, 4, 0.001f, 1, 1, 2};
+  const RenderSettings settings{4, 4, 0.001f, 1, 1, 1, 2, 1};
   renderer.render(make_default_scene(), make_default_camera(1.0f), settings);
   ASSERT_EQ(renderer.accumulated_samples(), 1);
 
@@ -67,14 +66,13 @@ TEST(CudaRenderer, RendersFiniteCanonicalImage) {
   }
   Renderer renderer;
   ASSERT_TRUE(renderer.set_backend(RendererBackendType::Cuda));
-  const Image image = renderer.render(make_default_scene(),
-                                      make_default_camera(1.0f),
-                                      {32, 32, 0.001f});
+  const Image image =
+      renderer.render(make_default_scene(), make_default_camera(1.0f), {32, 32, 0.001f});
 
   ASSERT_EQ(image.width, 32);
   ASSERT_EQ(image.height, 32);
   ASSERT_EQ(image.pixels.size(), 1024U);
-  for (const Vec3 &pixel : image.pixels) {
+  for (const Vec3& pixel : image.pixels) {
     EXPECT_TRUE(std::isfinite(pixel.x));
     EXPECT_TRUE(std::isfinite(pixel.y));
     EXPECT_TRUE(std::isfinite(pixel.z));
@@ -88,10 +86,8 @@ TEST(CudaRenderer, ReturnsEnvironmentForRayMiss) {
   Scene scene = make_default_scene();
   scene.environment.color = {0.25f, 0.5f, 0.75f};
   scene.environment.intensity = 1.0f;
-  const Camera miss_camera{{0.0f, 1.0f, 5.0f},
-                           {0.0f, 1.0f, 6.0f},
-                           {0.0f, 0.0f, 0.0f},
-                           {0.0f, 0.0f, 0.0f}};
+  const Camera miss_camera{
+      {0.0f, 1.0f, 5.0f}, {0.0f, 1.0f, 6.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}};
   Renderer renderer;
   ASSERT_TRUE(renderer.set_backend(RendererBackendType::Cuda));
   const Image image = renderer.render(scene, miss_camera, {1, 1, 0.001f});
@@ -107,12 +103,11 @@ TEST(CudaRenderer, SupportsDeterministicSupersampling) {
   }
   Renderer renderer;
   ASSERT_TRUE(renderer.set_backend(RendererBackendType::Cuda));
-  RenderSettings settings{32, 32, 0.001f, 4, 4, 1};
-  const Image image = renderer.render(make_default_scene(),
-                                      make_default_camera(1.0f), settings);
+  RenderSettings settings{32, 32, 0.001f, 4, 4, 4, 1, 1};
+  const Image image = renderer.render(make_default_scene(), make_default_camera(1.0f), settings);
 
   ASSERT_EQ(image.pixels.size(), 1024U);
-  for (const Vec3 &pixel : image.pixels) {
+  for (const Vec3& pixel : image.pixels) {
     EXPECT_TRUE(std::isfinite(pixel.x));
     EXPECT_TRUE(std::isfinite(pixel.y));
     EXPECT_TRUE(std::isfinite(pixel.z));
@@ -125,7 +120,7 @@ TEST(CudaRenderer, AccumulatesProgressiveFrames) {
   }
   Renderer renderer;
   ASSERT_TRUE(renderer.set_backend(RendererBackendType::Cuda));
-  RenderSettings settings{8, 8, 0.001f, 2, 4, 4};
+  RenderSettings settings{8, 8, 0.001f, 2, 4, 4, 4, 1};
   const Scene scene = make_default_scene();
   const Camera camera = make_default_camera(1.0f);
 
@@ -142,7 +137,7 @@ TEST(CudaRenderer, RendersEmissionWithoutDirectLight) {
     GTEST_SKIP() << "No CUDA-capable device is available";
   }
   Scene scene = make_default_scene();
-  Material &sphere_material = scene.materials[kSphereMaterialIndex];
+  Material& sphere_material = scene.materials[kSphereMaterialIndex];
   sphere_material.type = MaterialType::Emissive;
   sphere_material.base_color = {};
   sphere_material.emission_color = {0.2f, 0.4f, 0.8f};
@@ -152,9 +147,8 @@ TEST(CudaRenderer, RendersEmissionWithoutDirectLight) {
 
   Renderer renderer;
   ASSERT_TRUE(renderer.set_backend(RendererBackendType::Cuda));
-  const Image image = renderer.render(scene, make_default_camera(1.0f),
-                                      {32, 32, 0.001f, 1, 1});
-  const Vec3 &center_pixel = image.pixels[16 * image.width + 16];
+  const Image image = renderer.render(scene, make_default_camera(1.0f), {32, 32, 0.001f, 1, 1});
+  const Vec3& center_pixel = image.pixels[16 * image.width + 16];
 
   EXPECT_NEAR(center_pixel.x, 0.4f, 1.0e-5f);
   EXPECT_NEAR(center_pixel.y, 0.8f, 1.0e-5f);
@@ -166,7 +160,7 @@ TEST(CudaRenderer, ReflectsEnvironmentThroughMetalSphere) {
     GTEST_SKIP() << "No CUDA-capable device is available";
   }
   Scene scene = make_default_scene();
-  Material &sphere_material = scene.materials[kSphereMaterialIndex];
+  Material& sphere_material = scene.materials[kSphereMaterialIndex];
   apply_material_preset(sphere_material, MaterialPreset::Metal);
   sphere_material.base_color = {0.8f, 0.6f, 0.4f};
   scene.environment.intensity = 0.0f;
@@ -176,9 +170,8 @@ TEST(CudaRenderer, ReflectsEnvironmentThroughMetalSphere) {
 
   Renderer renderer;
   ASSERT_TRUE(renderer.set_backend(RendererBackendType::Cuda));
-  const Image image = renderer.render(scene, make_default_camera(1.0f),
-                                      {32, 32, 0.001f, 1, 1, 1});
-  const Vec3 &center_pixel = image.pixels[16 * image.width + 16];
+  const Image image = renderer.render(scene, make_default_camera(1.0f), {32, 32, 0.001f, 1, 1, 1});
+  const Vec3& center_pixel = image.pixels[16 * image.width + 16];
 
   EXPECT_NEAR(center_pixel.x, 0.2f, 1.0e-5f);
   EXPECT_NEAR(center_pixel.y, 0.3f, 1.0e-5f);
@@ -190,7 +183,7 @@ TEST(CudaRenderer, RendersGlassMaterial) {
     GTEST_SKIP() << "No CUDA-capable device is available";
   }
   Scene scene = make_default_scene();
-  Material &sphere_material = scene.materials[kSphereMaterialIndex];
+  Material& sphere_material = scene.materials[kSphereMaterialIndex];
   sphere_material.type = MaterialType::Dielectric;
   sphere_material.index_of_refraction = 1.5f;
   sphere_material.base_color = {1.0f, 1.0f, 1.0f};
@@ -199,9 +192,9 @@ TEST(CudaRenderer, RendersGlassMaterial) {
 
   Renderer renderer;
   ASSERT_TRUE(renderer.set_backend(RendererBackendType::Cuda));
-  const Image image = renderer.render(scene, make_default_camera(1.0f),
-                                      {16, 16, 0.001f, 1, 4, 1, 3});
-  for (const Vec3 &pixel : image.pixels) {
+  const Image image =
+      renderer.render(scene, make_default_camera(1.0f), {16, 16, 0.001f, 1, 4, 1, 3});
+  for (const Vec3& pixel : image.pixels) {
     EXPECT_TRUE(std::isfinite(pixel.x));
     EXPECT_TRUE(std::isfinite(pixel.y));
     EXPECT_TRUE(std::isfinite(pixel.z));
@@ -213,7 +206,7 @@ TEST(CudaRenderer, RendersColoredGlassWithFinitePixels) {
     GTEST_SKIP() << "No CUDA-capable device is available";
   }
   Scene scene = make_default_scene();
-  Material &sphere_material = scene.materials[kSphereMaterialIndex];
+  Material& sphere_material = scene.materials[kSphereMaterialIndex];
   sphere_material.type = MaterialType::Dielectric;
   sphere_material.index_of_refraction = 1.5f;
   sphere_material.base_color = {1.0f, 1.0f, 1.0f};
@@ -222,13 +215,12 @@ TEST(CudaRenderer, RendersColoredGlassWithFinitePixels) {
 
   Renderer renderer;
   ASSERT_TRUE(renderer.set_backend(RendererBackendType::Cuda));
-  const Image image = renderer.render(scene, make_default_camera(1.0f),
-                                      {32, 32, 0.001f, 2, 4, 2, 3});
+  const Image image =
+      renderer.render(scene, make_default_camera(1.0f), {32, 32, 0.001f, 2, 4, 4, 2, 3});
   bool has_channel_difference = false;
   EXPECT_TRUE(image_is_finite(image));
-  for (const Vec3 &pixel : image.pixels) {
-    if (fabsf(pixel.x - pixel.z) > 1.0e-4f ||
-        fabsf(pixel.y - pixel.z) > 1.0e-4f) {
+  for (const Vec3& pixel : image.pixels) {
+    if (fabsf(pixel.x - pixel.z) > 1.0e-4f || fabsf(pixel.y - pixel.z) > 1.0e-4f) {
       has_channel_difference = true;
     }
   }
@@ -240,14 +232,14 @@ TEST(CudaRenderer, GlassIorChangesGpuImageStatistics) {
     GTEST_SKIP() << "No CUDA-capable device is available";
   }
   Scene scene = make_default_scene();
-  Material &glass = scene.materials[kSphereMaterialIndex];
+  Material& glass = scene.materials[kSphereMaterialIndex];
   glass.type = MaterialType::Dielectric;
   glass.base_color = {1.0f, 1.0f, 1.0f};
   scene.environment.color = {0.05f, 0.05f, 0.05f};
   scene.environment.intensity = 1.0f;
   scene.light.point.radiant_intensity = 0.0f;
   const Camera camera = make_default_camera(1.0f);
-  const RenderSettings settings{32, 32, 0.001f, 8, 4, 8, 4};
+  const RenderSettings settings{32, 32, 0.001f, 8, 4, 4, 8, 4};
 
   Renderer low_ior_renderer;
   ASSERT_TRUE(low_ior_renderer.set_backend(RendererBackendType::Cuda));
@@ -261,9 +253,7 @@ TEST(CudaRenderer, GlassIorChangesGpuImageStatistics) {
 
   EXPECT_TRUE(image_is_finite(low_ior));
   EXPECT_TRUE(image_is_finite(high_ior));
-  EXPECT_GT(fabsf(image_mean_luminance(low_ior) -
-                  image_mean_luminance(high_ior)),
-            1.0e-5f);
+  EXPECT_GT(fabsf(image_mean_luminance(low_ior) - image_mean_luminance(high_ior)), 1.0e-5f);
 }
 
 TEST(CudaRenderer, GlassAbsorptionChangesGpuImageStatistics) {
@@ -271,7 +261,7 @@ TEST(CudaRenderer, GlassAbsorptionChangesGpuImageStatistics) {
     GTEST_SKIP() << "No CUDA-capable device is available";
   }
   Scene scene = make_default_scene();
-  Material &glass = scene.materials[kSphereMaterialIndex];
+  Material& glass = scene.materials[kSphereMaterialIndex];
   glass.type = MaterialType::Dielectric;
   glass.index_of_refraction = 1.5f;
   glass.base_color = {1.0f, 1.0f, 1.0f};
@@ -280,7 +270,7 @@ TEST(CudaRenderer, GlassAbsorptionChangesGpuImageStatistics) {
   scene.environment.intensity = 1.0f;
   scene.light.point.radiant_intensity = 0.0f;
   const Camera camera = make_default_camera(1.0f);
-  const RenderSettings settings{32, 32, 0.001f, 8, 4, 8, 4};
+  const RenderSettings settings{32, 32, 0.001f, 8, 4, 4, 8, 4};
 
   Renderer clear_renderer;
   ASSERT_TRUE(clear_renderer.set_backend(RendererBackendType::Cuda));
@@ -302,19 +292,16 @@ TEST(CudaRenderer, GlassRemainsFiniteAtObliqueCameraAngle) {
     GTEST_SKIP() << "No CUDA-capable device is available";
   }
   Scene scene = make_default_scene();
-  Material &glass = scene.materials[kSphereMaterialIndex];
+  Material& glass = scene.materials[kSphereMaterialIndex];
   glass.type = MaterialType::Dielectric;
   glass.index_of_refraction = 1.5f;
   glass.transmission_color = {0.8f, 0.4f, 0.2f};
   glass.absorption_density = 2.0f;
-  const Camera camera{{2.8f, 1.8f, 4.0f},
-                      {0.0f, 1.0f, 0.0f},
-                      {0.0f, 1.0f, 0.0f},
-                      {0.0f, 0.0f, 0.0f}};
+  const Camera camera{
+      {2.8f, 1.8f, 4.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}};
   Renderer renderer;
   ASSERT_TRUE(renderer.set_backend(RendererBackendType::Cuda));
-  const Image image = renderer.render(scene, camera,
-                                      {32, 32, 0.001f, 8, 4, 8, 5});
+  const Image image = renderer.render(scene, camera, {32, 32, 0.001f, 8, 4, 8, 5});
 
   EXPECT_TRUE(image_is_finite(image));
 }
@@ -332,11 +319,10 @@ TEST(CudaRenderer, EmissiveSphereCanIlluminateTheFloor) {
 
   Renderer renderer;
   ASSERT_TRUE(renderer.set_backend(RendererBackendType::Cuda));
-  const Image image = renderer.render(scene, make_default_camera(1.0f),
-                                      {32, 32, 0.001f, 1, 1, 1});
+  const Image image = renderer.render(scene, make_default_camera(1.0f), {32, 32, 0.001f, 1, 1, 1});
 
   bool has_nonblack_floor_pixel = false;
-  for (const Vec3 &pixel : image.pixels) {
+  for (const Vec3& pixel : image.pixels) {
     if (pixel.x > 0.001f || pixel.y > 0.001f || pixel.z > 0.001f) {
       has_nonblack_floor_pixel = true;
       break;
@@ -350,7 +336,7 @@ TEST(CudaRenderer, SingleSphereGlassWithEmissionRemainsFinite) {
     GTEST_SKIP() << "No CUDA-capable device is available";
   }
   Scene scene = make_default_scene();
-  Material &sphere = scene.materials[kSphereMaterialIndex];
+  Material& sphere = scene.materials[kSphereMaterialIndex];
   sphere.type = MaterialType::Dielectric;
   sphere.index_of_refraction = 1.5f;
   sphere.transmission_color = {0.8f, 0.4f, 0.2f};
@@ -362,8 +348,8 @@ TEST(CudaRenderer, SingleSphereGlassWithEmissionRemainsFinite) {
 
   Renderer renderer;
   ASSERT_TRUE(renderer.set_backend(RendererBackendType::Cuda));
-  const Image image = renderer.render(scene, make_default_camera(1.0f),
-                                      {32, 32, 0.001f, 2, 4, 2, 4});
+  const Image image =
+      renderer.render(scene, make_default_camera(1.0f), {32, 32, 0.001f, 2, 4, 2, 4});
 
   EXPECT_TRUE(image_is_finite(image));
 }

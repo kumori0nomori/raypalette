@@ -75,7 +75,8 @@ int main() {
                                       /*height=*/512,
                                       /*minimum_distance=*/0.001f,
                                       /*samples_per_pixel=*/4,
-                                      /*light_samples_per_frame=*/4,
+                                      /*area_light_samples_per_frame=*/4,
+                                      /*emissive_light_samples_per_frame=*/4,
                                       /*target_samples_per_pixel=*/64,
                                       /*max_bounces=*/8};
   float camera_distance = 5.0f;

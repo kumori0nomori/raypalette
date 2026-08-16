@@ -25,9 +25,10 @@ __global__ void render_kernel(Vec3* pixels, Scene scene, Camera camera, RenderSe
     const float fresnel_random = detail::sample_unit(pixel_index, global_sample, 2);
     const float u = (static_cast<float>(x) + subpixel_x) / settings.width;
     const float v = (static_cast<float>(y) + subpixel_y) / settings.height;
-    accumulated_color +=
-        detail::trace_color(scene, camera_ray(camera, u, v), settings.minimum_distance, 0,
-                            settings.max_bounces, fresnel_random, settings.light_samples_per_frame);
+    accumulated_color += detail::trace_color(scene, camera_ray(camera, u, v),
+                                             settings.minimum_distance, 0, settings.max_bounces,
+                                             fresnel_random, settings.area_light_samples_per_frame,
+                                             settings.emissive_light_samples_per_frame);
   }
   pixels[y * settings.width + x] = accumulated_color * (1.0f / samples_this_frame);
 }

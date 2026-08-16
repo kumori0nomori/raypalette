@@ -140,7 +140,23 @@ TEST(CpuRenderer, SupportsSixteenAreaLightSamples) {
   Scene scene = make_default_scene();
   scene.light = make_rect_area_light({4.0f, 35.0f, 45.0f}, scene.sphere.center, {0.0f, -1.0f, 0.0f},
                                      1.0f, 1.0f, {1.0f, 1.0f, 1.0f}, 100.0f);
-  RenderSettings settings{8, 8, 0.001f, 1, 16, 1, 2};
+  RenderSettings settings{8, 8, 0.001f, 1, 16, 4, 1, 2};
+  Renderer renderer;
+
+  const Image image = renderer.render(scene, make_default_camera(1.0f), settings);
+
+  EXPECT_TRUE(image_is_finite(image));
+}
+
+TEST(CpuRenderer, SupportsNonSquareEmissiveLightSamples) {
+  Scene scene = make_default_scene();
+  Material& sphere_material = scene.materials[kSphereMaterialIndex];
+  sphere_material.type = MaterialType::Emissive;
+  sphere_material.base_color = {};
+  sphere_material.emission_color = {0.4f, 0.2f, 0.1f};
+  sphere_material.emission_strength = 2.0f;
+
+  RenderSettings settings{8, 8, 0.001f, 1, 4, 8, 1, 2};
   Renderer renderer;
 
   const Image image = renderer.render(scene, make_default_camera(1.0f), settings);
@@ -192,7 +208,7 @@ TEST(CpuRenderer, ReturnsEnvironmentForRayMiss) {
 
 TEST(CpuRenderer, AccumulatesProgressiveFrames) {
   Renderer renderer;
-  RenderSettings settings{4, 4, 0.001f, 2, 4, 4};
+  RenderSettings settings{4, 4, 0.001f, 2, 4, 4, 4, 1};
   const Scene scene = make_default_scene();
   const Camera camera = make_default_camera(1.0f);
 

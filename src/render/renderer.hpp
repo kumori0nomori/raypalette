@@ -16,8 +16,10 @@ struct RenderSettings {
   float minimum_distance = 0.001f;
   // number of path samples per pixel
   int samples_per_pixel = 1;
-  // number of shadow rays per intersection
-  int light_samples_per_frame = 4;
+  // number of samples for rectangular area lights
+  int area_light_samples_per_frame = 4;
+  // number of samples for emissive sphere lighting
+  int emissive_light_samples_per_frame = 4;
   // number of accumulated path samples per pixel
   int target_samples_per_pixel = 1;
   int max_bounces = 1;
