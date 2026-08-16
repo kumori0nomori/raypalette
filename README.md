@@ -53,24 +53,43 @@ Get-FileHash .\raypalette.exe -Algorithm SHA256
 
     | 材質 | 概要 | 例 | 設定項目 |
     |---|---|---|---|
-    | `Diffuse` | 光を拡散反射するマットな材質 | チョークや粘土、石膏、コピー用紙、布製品 | `Color` |
-    | `Metal` | 金属のように光を反射する材質 | 鏡、金属、車のボディ | `Color`, `Roughness` |
+    | `Surface` | 不透明な表面を表現する汎用材質モデル | 塗装、金属、布、皮膚、毛髪 | `Color`, `Roughness`, `Material details` |
     | `Glass` | 光の反射・屈折と内部吸収を表現する透明な材質 | 窓ガラス、レンズ、すりガラス、氷 | `Glass tint`, `Glass absorption density`, `Glass IOR` |
     | `Emissive` | 自ら光を放つ発光材質 | 液晶画面、ネオン管、蛍光灯 | `Emission color`, `Emission strength` |
+
+    また`Surface`の場合には、代表的なpresetを以下から選択できます。
+    presetで無効な`Material details`の項目は、GUI上でdisabled表示になります。`Custom`では全項目を編集できます。
+
+    | Preset | 概要 | 例 | `Material details` |
+    |---|---|---|---|
+    | `Custom` | 全てのSurfaceパラメータを手動で調整 | 任意のモデル | `Metallic`, `Specular`, `Sheen`, `Subsurface`, `Anisotropy`, `Coat`, `Coat roughness` |
+    | `Matte` | 粗い非金属表面 | チョーク、粘土、石膏、紙 | `Specular` |
+    | `Glossy` | 光沢のある非金属表面。コートを含みます | ラッカー、ニス塗装、釉薬、樹脂 | `Specular`, `Coat`, `Coat roughness` |
+    | `Metal` | 金属反射を使う表面 | 金属、鏡、車のボディ | `Metallic` |
+    | `Cloth` | Sheenを持つ布向けの表面 | 布、ベルベット | `Specular`, `Sheen` |
+    | `Skin` | Subsurface近似を持つ表面 | 皮膚、蝋 | `Specular`, `Subsurface` |
+    | `Hair` | 異方性反射を持つ表面 | 毛髪、ブラシ仕上げの金属 | `Specular`, `Anisotropy` |
 
     各設定値(`Color`、`Roughness`など)の詳細を以下に記載します。
 
     <details>
 
-    | 設定 | 説明 |
-    |---|---|
-    | `Color` | 材質の基本色です。Diffuseでは拡散反射色、Metalでは鏡面反射色として使用されます。 |
-    | `Roughness` | 金属表面の粗さです。0に近いほど鏡面反射が鋭く、1に近いほどぼやけます。 |
-    | `Glass tint` | ガラスを通過する光の色です。 |
-    | `Glass absorption density` | ガラス内部で光が吸収される強さです。 |
-    | `Glass IOR` | 屈折率です。入射角とともに反射・屈折の割合を決定します。 |
-    | `Emission color` | 発光する光の色です。 |
-    | `Emission strength` | 発光の強さです。値が大きいほど明るくなり、周囲への照明も強くなります。 |
+    | 設定 | 材質 | 説明 |
+    |---|---|---|
+    | `Color` | `Surface` | 材質の基本色です。非金属では表面色、Metalでは反射色として使用されます。 |
+    | `Roughness` | `Surface` | Surfaceの粗さです。0に近いほど鏡面反射が鋭く、1に近いほどぼやけます。 |
+    | `Metallic` | `Surface` | Surfaceの金属性です。0では非金属、1では金属として扱います。 |
+    | `Specular` | `Surface` | 非金属Surfaceの鏡面反射の強さです。 |
+    | `Sheen` | `Surface` | 布やベルベットのような、視線方向の縁に現れる柔らかな反射の強さです。 |
+    | `Subsurface` | `Surface` | 光が表面下へ回り込む簡易近似の強さです。皮膚や蝋などに使用します。 |
+    | `Anisotropy` | `Surface` | 反射の伸びる方向と強さです。Hairやブラシ仕上げの表面に使用します。 |
+    | `Coat` | `Surface` | 透明な上塗り層の強さです。ラッカーやニス塗装などに使用します。 |
+    | `Coat roughness` | `Surface` | 上塗り層の反射の粗さです。小さいほど鋭いハイライトになります。 |
+    | `Glass tint` | `Glass` | ガラスを通過する光の色です。 |
+    | `Glass absorption density` | `Glass` | ガラス内部で光が吸収される強さです。 |
+    | `Glass IOR` | `Glass` | 屈折率です。入射角とともに反射・屈折の割合を決定します。 |
+    | `Emission color` | `Emissive` | 発光する光の色です。 |
+    | `Emission strength` | `Emissive` | 発光の強さです。値が大きいほど明るくなり、周囲への照明も強くなります。 |
 
     </details>
 

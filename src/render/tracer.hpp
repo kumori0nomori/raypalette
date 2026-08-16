@@ -3,6 +3,7 @@
 #include "render/bsdf.hpp"
 #include "render/light_sampling.hpp"
 #include "render/renderer.hpp"
+#include "render/surface.hpp"
 
 namespace raypalette {
 namespace detail {
@@ -30,7 +31,6 @@ RAYPALETTE_HOST_DEVICE inline float sample_unit(unsigned int pixel_index, unsign
 }
 
 constexpr int kMaxLightSampleCount = 16;
-constexpr float kPi = 3.14159265358979323846f;
 
 RAYPALETTE_HOST_DEVICE constexpr int sample_count_to_grid_size(int sample_count) {
   return sample_count >= 16 ? 4 : sample_count >= 9 ? 3 : sample_count >= 4 ? 2 : 1;
@@ -52,12 +52,6 @@ RAYPALETTE_HOST_DEVICE inline bool hit_scene(const Scene& scene, const Ray& ray,
     hit_anything = true;
   }
   return hit_anything;
-}
-
-RAYPALETTE_HOST_DEVICE inline float power_heuristic(float first_pdf, float second_pdf) {
-  const float first_squared = first_pdf * first_pdf;
-  const float second_squared = second_pdf * second_pdf;
-  return first_squared / fmaxf(1.0e-12f, first_squared + second_squared);
 }
 
 RAYPALETTE_HOST_DEVICE inline Vec3 emitted_radiance(const Material& material) {
@@ -147,20 +141,19 @@ RAYPALETTE_HOST_DEVICE inline Vec3 cosine_sample_direction(const Vec3& normal, f
 }
 
 RAYPALETTE_HOST_DEVICE inline Vec3
-evaluate_diffuse_lighting(const Scene& scene, const HitRecord& record, const Material& material,
-                          float minimum_distance, int light_sample_count, float random_value) {
-  const Vec3 ambient = material.base_color * scene.environment.color * scene.environment.intensity;
+evaluate_surface_lighting(const Scene& scene, const Ray& ray, const HitRecord& record,
+                          const PrincipledParameters& material, float minimum_distance,
+                          int light_sample_count, float random_value) {
+  const float diffuse_weight = 1.0f - material.metallic;
+  const Vec3 ambient =
+      material.base_color * diffuse_weight * scene.environment.color * scene.environment.intensity;
   Vec3 direct_light;
   for (int sample_index = 0; sample_index < light_sample_count; ++sample_index) {
     LightSample light_sample;
     if (!try_sample_light(scene, record, sample_index, light_sample_count, light_sample))
       continue;
-    const float cosine = fmaxf(0.0f, dot(record.normal, light_sample.direction_to_light));
-    if (cosine > 0.0f && visible_to_light(scene, record, light_sample, minimum_distance)) {
-      const float bsdf_pdf = cosine / kPi;
-      const float mis_weight =
-          light_sample.pdf <= 0.0f ? 1.0f : power_heuristic(light_sample.pdf, bsdf_pdf);
-      direct_light += material.base_color * light_sample.radiance * cosine * mis_weight;
+    if (visible_to_light(scene, record, light_sample, minimum_distance)) {
+      direct_light += evaluate_surface_light_sample(ray, record, material, light_sample);
     }
   }
   if (scene.light.type == LightType::RectArea)
@@ -171,52 +164,17 @@ evaluate_diffuse_lighting(const Scene& scene, const HitRecord& record, const Mat
     LightSample light_sample;
     if (!try_sample_emissive_sphere(scene, record, sample_index, random_value, light_sample))
       continue;
-    const float cosine = fmaxf(0.0f, dot(record.normal, light_sample.direction_to_light));
-    if (cosine > 0.0f && visible_to_light(scene, record, light_sample, minimum_distance)) {
-      const float bsdf_pdf = cosine / kPi;
-      const float mis_weight = power_heuristic(light_sample.pdf, bsdf_pdf);
-      emissive_direct_light += material.base_color * light_sample.radiance * cosine * mis_weight;
+    if (visible_to_light(scene, record, light_sample, minimum_distance)) {
+      emissive_direct_light += evaluate_surface_light_sample(ray, record, material, light_sample);
     }
   }
   emissive_direct_light *= 1.0f / light_sample_count;
   return ambient + direct_light + emissive_direct_light;
 }
 
-RAYPALETTE_HOST_DEVICE inline Vec3
-evaluate_metal_lighting(const Scene& scene, const Ray& ray, const HitRecord& record,
-                        const Material& material, float minimum_distance, int light_sample_count) {
-  const Vec3 view_direction = normalized(-ray.direction);
-  const float n_dot_v = fmaxf(0.0f, dot(record.normal, view_direction));
-  Vec3 direct_reflection;
-  for (int sample_index = 0; sample_index < light_sample_count; ++sample_index) {
-    LightSample light_sample;
-    if (!try_sample_light(scene, record, sample_index, light_sample_count, light_sample))
-      continue;
-    const float n_dot_l = fmaxf(0.0f, dot(record.normal, light_sample.direction_to_light));
-    if (n_dot_l <= 0.0f || n_dot_v <= 0.0f ||
-        !visible_to_light(scene, record, light_sample, minimum_distance))
-      continue;
-    const Vec3 half_vector = normalized(view_direction + light_sample.direction_to_light);
-    const float n_dot_h = fmaxf(0.0f, dot(record.normal, half_vector));
-    const float v_dot_h = fmaxf(0.0f, dot(view_direction, half_vector));
-    const float distribution = ggx_distribution(n_dot_h, material.roughness);
-    const float geometry = ggx_geometry(n_dot_v, n_dot_l, material.roughness);
-    const Vec3 fresnel = schlick_fresnel(material.base_color, v_dot_h);
-    const Vec3 brdf =
-        fresnel * (distribution * geometry / fmaxf(1.0e-6f, 4.0f * n_dot_v * n_dot_l));
-    const float bsdf_pdf = ggx_reflection_pdf(n_dot_h, v_dot_h, material.roughness);
-    const float mis_weight =
-        light_sample.pdf <= 0.0f ? 1.0f : power_heuristic(light_sample.pdf, bsdf_pdf);
-    direct_reflection += light_sample.radiance * brdf * n_dot_l * mis_weight;
-  }
-  if (scene.light.type == LightType::RectArea)
-    direct_reflection *= 1.0f / light_sample_count;
-  return direct_reflection;
-}
-
-RAYPALETTE_HOST_DEVICE inline Vec3 next_diffuse_direction(const HitRecord& record,
-                                                          float random_value, int bounce,
-                                                          float& next_random) {
+RAYPALETTE_HOST_DEVICE inline Vec3 sample_surface_diffuse_direction(const HitRecord& record,
+                                                                    float random_value, int bounce,
+                                                                    float& next_random) {
   const unsigned int random_bits = float_bits(random_value);
   next_random =
       static_cast<float>(sample_hash(random_bits + static_cast<unsigned int>(bounce + 1)) &
@@ -247,15 +205,16 @@ RAYPALETTE_HOST_DEVICE inline void scatter_dielectric(const Ray& ray, const HitR
   }
 }
 
-RAYPALETTE_HOST_DEVICE inline void scatter_metal(const Ray& ray, const HitRecord& record,
-                                                 const Material& material, float random_value,
-                                                 int bounce, Vec3& direction,
-                                                 Vec3& throughput_factor, float& next_random,
-                                                 float& bsdf_pdf) {
+RAYPALETTE_HOST_DEVICE inline void
+scatter_surface_specular(const Ray& ray, const HitRecord& record,
+                         const PrincipledParameters& material, float random_value, int bounce,
+                         Vec3& direction, Vec3& throughput_factor, float& next_random,
+                         float& bsdf_pdf, const Vec3& specular_f0) {
   const Vec3 incoming = normalized(ray.direction);
-  if (material.roughness <= 0.001f) {
+  const float specular_roughness = surface_effective_roughness(material);
+  if (specular_roughness <= 0.001f) {
     direction = reflect_direction(incoming, record.normal);
-    throughput_factor = material.base_color;
+    throughput_factor = specular_f0;
     next_random = random_value;
     bsdf_pdf = 0.0f;
     return;
@@ -263,16 +222,19 @@ RAYPALETTE_HOST_DEVICE inline void scatter_metal(const Ray& ray, const HitRecord
   const unsigned int seed = float_bits(random_value) + static_cast<unsigned int>(bounce * 7919);
   const float sample_u = static_cast<float>(sample_hash(seed) & 0x00ffffffU) / 16777216.0f;
   next_random = static_cast<float>(sample_hash(seed + 1U) & 0x00ffffffU) / 16777216.0f;
-  const float alpha = material.roughness * material.roughness;
+  const float alpha = specular_roughness * specular_roughness;
   const float alpha_squared = alpha * alpha;
   const float cos_theta =
       sqrtf((1.0f - next_random) / (1.0f + (alpha_squared - 1.0f) * next_random));
   const float sin_theta = sqrtf(fmaxf(0.0f, 1.0f - cos_theta * cos_theta));
   const float phi = 2.0f * kPi * sample_u;
-  const Vec3 local_half{sin_theta * cosf(phi), sin_theta * sinf(phi), cos_theta};
-  const Vec3 reference =
-      fabsf(record.normal.x) > 0.9f ? Vec3{0.0f, 1.0f, 0.0f} : Vec3{1.0f, 0.0f, 0.0f};
-  const Vec3 tangent = normalized(cross(reference, record.normal));
+  const float isotropic_alpha = fmaxf(0.001f, specular_roughness * specular_roughness);
+  float alpha_x;
+  float alpha_y;
+  ggx_anisotropic_alphas(specular_roughness, material.anisotropy, alpha_x, alpha_y);
+  const Vec3 local_half{sin_theta * cosf(phi) * alpha_x / isotropic_alpha,
+                        sin_theta * sinf(phi) * alpha_y / isotropic_alpha, cos_theta};
+  const Vec3 tangent = record.tangent;
   const Vec3 half_vector =
       normalized(local_half.x * tangent + local_half.y * cross(record.normal, tangent) +
                  local_half.z * record.normal);
@@ -284,14 +246,54 @@ RAYPALETTE_HOST_DEVICE inline void scatter_metal(const Ray& ray, const HitRecord
   const float v_dot_h = fmaxf(0.0f, dot(view_direction, half_vector));
   if (n_dot_l <= 0.0f || n_dot_v <= 0.0f || n_dot_h <= 0.0f || v_dot_h <= 1.0e-6f) {
     direction = reflect_direction(incoming, record.normal);
-    throughput_factor = material.base_color;
+    throughput_factor = specular_f0;
     bsdf_pdf = 0.0f;
     return;
   }
-  const float geometry = ggx_geometry(n_dot_v, n_dot_l, material.roughness);
-  const Vec3 fresnel = schlick_fresnel(material.base_color, v_dot_h);
+  const float geometry = ggx_geometry(n_dot_v, n_dot_l, specular_roughness);
+  const Vec3 fresnel = schlick_fresnel(specular_f0, v_dot_h);
   throughput_factor = fresnel * (geometry * v_dot_h / fmaxf(1.0e-6f, n_dot_v * n_dot_h));
-  bsdf_pdf = ggx_reflection_pdf(n_dot_h, v_dot_h, material.roughness);
+  bsdf_pdf = ggx_anisotropic_reflection_pdf(record.normal, record.tangent, half_vector, v_dot_h,
+                                            specular_roughness, material.anisotropy);
+}
+
+struct SurfaceSample {
+  Vec3 direction;
+  Vec3 throughput_factor;
+  float pdf = 0.0f;
+  float next_random = 0.0f;
+  bool delta = false;
+};
+
+RAYPALETTE_HOST_DEVICE inline SurfaceSample sample_surface(const Ray& ray, const HitRecord& record,
+                                                           const PrincipledParameters& material,
+                                                           float random_value, int bounce) {
+  SurfaceSample sample;
+  const float specular_probability = surface_specular_probability(material);
+  const float diffuse_probability = 1.0f - specular_probability;
+  if (random_value < specular_probability) {
+    float specular_pdf;
+    scatter_surface_specular(ray, record, material, random_value, bounce, sample.direction,
+                             sample.throughput_factor, sample.next_random, specular_pdf,
+                             surface_effective_f0(material));
+    const float diffuse_pdf = fmaxf(0.0f, dot(record.normal, sample.direction)) / kPi;
+    sample.pdf = surface_mixture_pdf(material, diffuse_pdf, specular_pdf);
+    sample.throughput_factor = sample.throughput_factor / fmaxf(1.0e-6f, specular_probability);
+    sample.delta = specular_pdf <= 0.0f;
+    return sample;
+  }
+
+  sample.direction =
+      sample_surface_diffuse_direction(record, random_value, bounce, sample.next_random);
+  const float diffuse_pdf = fmaxf(0.0f, dot(record.normal, sample.direction)) / kPi;
+  const float specular_pdf = surface_specular_pdf(ray, record, sample.direction, material);
+  sample.pdf = surface_mixture_pdf(material, diffuse_pdf, specular_pdf);
+  const float sheen_factor = surface_sheen_factor(ray, record, material, sample.direction);
+  const float subsurface_factor = surface_subsurface_cosine(record, material, sample.direction);
+  sample.throughput_factor =
+      ((1.0f - material.metallic + sheen_factor + subsurface_factor) * material.base_color) /
+      fmaxf(1.0e-6f, diffuse_probability);
+  return sample;
 }
 
 RAYPALETTE_HOST_DEVICE inline float emissive_sphere_pdf(const Scene& scene, const Ray& ray,
@@ -350,38 +352,22 @@ RAYPALETTE_HOST_DEVICE inline Vec3 trace_color(const Scene& scene, const Ray& ra
     if (material.type == MaterialType::Emissive)
       break;
     switch (material.type) {
-    case MaterialType::Diffuse: {
+    case MaterialType::Surface: {
+      const PrincipledParameters parameters = resolve_principled_parameters(material);
       path_radiance +=
-          throughput * evaluate_diffuse_lighting(scene, record, material, minimum_distance,
-                                                 light_sample_count, path_random);
+          throughput * evaluate_surface_lighting(scene, current_ray, record, parameters,
+                                                 minimum_distance, light_sample_count, path_random);
       if (bounce >= max_bounces || !apply_russian_roulette(throughput, path_random, bounce)) {
         return path_radiance;
       }
-      const Vec3 scattered_direction =
-          next_diffuse_direction(record, path_random, bounce, path_random);
-      throughput = throughput * material.base_color;
-      previous_bsdf_pdf = fmaxf(0.0f, dot(record.normal, scattered_direction)) / kPi;
-      previous_scatter_was_delta = false;
-      current_ray = {record.position + minimum_distance * record.normal, scattered_direction};
-      continue;
-    }
-    case MaterialType::Metal: {
-      path_radiance += throughput * evaluate_metal_lighting(scene, current_ray, record, material,
-                                                            minimum_distance, light_sample_count);
-      if (bounce >= max_bounces || !apply_russian_roulette(throughput, path_random, bounce)) {
-        return path_radiance;
-      }
-      Vec3 direction;
-      Vec3 throughput_factor;
-      float next_random;
-      float bsdf_pdf;
-      scatter_metal(current_ray, record, material, path_random, bounce, direction,
-                    throughput_factor, next_random, bsdf_pdf);
-      throughput = throughput * throughput_factor;
-      previous_bsdf_pdf = bsdf_pdf;
-      previous_scatter_was_delta = bsdf_pdf <= 0.0f;
-      current_ray = {record.position + minimum_distance * record.normal, direction};
-      path_random = next_random;
+
+      const SurfaceSample sample =
+          sample_surface(current_ray, record, parameters, path_random, bounce);
+      throughput = throughput * sample.throughput_factor;
+      previous_bsdf_pdf = sample.pdf;
+      previous_scatter_was_delta = sample.delta;
+      current_ray = {record.position + minimum_distance * record.normal, sample.direction};
+      path_random = sample.next_random;
       continue;
     }
     case MaterialType::Dielectric: {

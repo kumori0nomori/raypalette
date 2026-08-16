@@ -6,9 +6,15 @@
 
 namespace raypalette {
 
+RAYPALETTE_HOST_DEVICE inline Vec3 stable_tangent(const Vec3& normal) {
+  const Vec3 reference = fabsf(normal.y) < 0.9f ? Vec3{0.0f, 1.0f, 0.0f} : Vec3{1.0f, 0.0f, 0.0f};
+  return normalized(cross(reference, normal));
+}
+
 struct HitRecord {
   Vec3 position;
   Vec3 normal;
+  Vec3 tangent;
   float distance = 0.0f;
   std::uint32_t material_index = 0;
   bool front_face = true;
@@ -16,6 +22,10 @@ struct HitRecord {
   RAYPALETTE_HOST_DEVICE void set_face_normal(const Ray& ray, const Vec3& outward_normal) {
     front_face = dot(ray.direction, outward_normal) < 0.0f;
     normal = front_face ? outward_normal : -outward_normal;
+  }
+
+  RAYPALETTE_HOST_DEVICE void set_tangent() {
+    tangent = stable_tangent(normal);
   }
 };
 
@@ -63,7 +73,9 @@ RAYPALETTE_HOST_DEVICE inline bool hit_sphere(const Sphere& sphere, const Ray& r
   record.distance = distance;
   record.position = ray.at(distance);
   record.material_index = sphere.material_index;
-  record.set_face_normal(ray, (record.position - sphere.center) * (1.0f / sphere.radius));
+  const Vec3 outward_normal = (record.position - sphere.center) * (1.0f / sphere.radius);
+  record.set_face_normal(ray, outward_normal);
+  record.set_tangent();
   return true;
 }
 
@@ -90,6 +102,7 @@ RAYPALETTE_HOST_DEVICE inline bool hit_plane(const Plane& plane, const Ray& ray,
   record.position = ray.at(distance);
   record.material_index = plane.material_index;
   record.set_face_normal(ray, plane_normal);
+  record.set_tangent();
   return true;
 }
 

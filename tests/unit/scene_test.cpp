@@ -1,6 +1,7 @@
 #include "render/bsdf.hpp"
 #include "render/light_sampling.hpp"
 #include "render/scene.hpp"
+#include "render/tracer.hpp"
 
 #include <gtest/gtest.h>
 
@@ -9,8 +10,134 @@
 namespace raypalette {
 namespace {
 
-TEST(Material, AcceptsDefaultDiffuseMaterial) {
+TEST(Material, AcceptsDefaultSurfaceMaterial) {
   EXPECT_TRUE(is_valid_material({}));
+}
+
+TEST(Material, ResolvesSurfacePresets) {
+  Material material;
+  apply_material_preset(material, MaterialPreset::Metal);
+  material.roughness = 0.2f;
+  PrincipledParameters metal = resolve_principled_parameters(material);
+  EXPECT_FLOAT_EQ(metal.metallic, 1.0f);
+  EXPECT_FLOAT_EQ(metal.roughness, 0.2f);
+
+  apply_material_preset(material, MaterialPreset::Glossy);
+  const PrincipledParameters glossy = resolve_principled_parameters(material);
+  EXPECT_FLOAT_EQ(glossy.metallic, 0.0f);
+  EXPECT_FLOAT_EQ(glossy.roughness, 0.22f);
+  EXPECT_FLOAT_EQ(glossy.coat, 0.7f);
+  EXPECT_FLOAT_EQ(glossy.coat_roughness, 0.04f);
+
+  apply_material_preset(material, MaterialPreset::Cloth);
+  const PrincipledParameters cloth = resolve_principled_parameters(material);
+  EXPECT_FLOAT_EQ(cloth.sheen, 0.6f);
+  EXPECT_FLOAT_EQ(cloth.coat, 0.0f);
+  EXPECT_FLOAT_EQ(cloth.coat_roughness, 0.0f);
+}
+
+TEST(Material, AppliesAllSurfacePresetValues) {
+  struct PresetExpectation {
+    MaterialPreset preset;
+    float metallic;
+    float roughness;
+    float coat;
+    float coat_roughness;
+    float sheen;
+    float subsurface;
+    float anisotropy;
+  };
+  const PresetExpectation expectations[] = {
+      {MaterialPreset::Matte, 0.0f, 0.85f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f},
+      {MaterialPreset::Glossy, 0.0f, 0.22f, 0.7f, 0.04f, 0.0f, 0.0f, 0.0f},
+      {MaterialPreset::Metal, 1.0f, 0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f},
+      {MaterialPreset::Cloth, 0.0f, 0.8f, 0.0f, 0.0f, 0.6f, 0.0f, 0.0f},
+      {MaterialPreset::Skin, 0.0f, 0.45f, 0.0f, 0.0f, 0.0f, 0.35f, 0.0f},
+      {MaterialPreset::Hair, 0.0f, 0.35f, 0.0f, 0.0f, 0.0f, 0.0f, 0.8f},
+  };
+
+  for (const PresetExpectation& expectation : expectations) {
+    Material material;
+    apply_material_preset(material, expectation.preset);
+    const PrincipledParameters parameters = resolve_principled_parameters(material);
+
+    EXPECT_EQ(material.type, MaterialType::Surface);
+    EXPECT_EQ(material.preset, expectation.preset);
+    EXPECT_FLOAT_EQ(parameters.metallic, expectation.metallic);
+    EXPECT_FLOAT_EQ(parameters.roughness, expectation.roughness);
+    EXPECT_FLOAT_EQ(parameters.coat, expectation.coat);
+    EXPECT_FLOAT_EQ(parameters.coat_roughness, expectation.coat_roughness);
+    EXPECT_FLOAT_EQ(parameters.sheen, expectation.sheen);
+    EXPECT_FLOAT_EQ(parameters.subsurface, expectation.subsurface);
+    EXPECT_FLOAT_EQ(parameters.anisotropy, expectation.anisotropy);
+  }
+}
+
+TEST(Material, ExposesPresetCapabilities) {
+  const MaterialCapabilities custom = material_capabilities(MaterialPreset::Custom);
+  EXPECT_TRUE(custom.metallic);
+  EXPECT_TRUE(custom.specular);
+  EXPECT_TRUE(custom.sheen);
+  EXPECT_TRUE(custom.subsurface);
+  EXPECT_TRUE(custom.anisotropy);
+  EXPECT_TRUE(custom.coat);
+  EXPECT_TRUE(custom.coat_roughness);
+
+  const MaterialCapabilities glossy = material_capabilities(MaterialPreset::Glossy);
+  EXPECT_FALSE(glossy.metallic);
+  EXPECT_TRUE(glossy.specular);
+  EXPECT_TRUE(glossy.coat);
+  EXPECT_TRUE(glossy.coat_roughness);
+  EXPECT_FALSE(glossy.sheen);
+  EXPECT_FALSE(glossy.subsurface);
+  EXPECT_FALSE(glossy.anisotropy);
+
+  const MaterialCapabilities hair = material_capabilities(MaterialPreset::Hair);
+  EXPECT_TRUE(hair.specular);
+  EXPECT_TRUE(hair.anisotropy);
+  EXPECT_FALSE(hair.coat);
+}
+
+TEST(Material, CustomPresetPreservesManualSurfaceValues) {
+  Material material;
+  material.type = MaterialType::Dielectric;
+  material.metallic = 0.35f;
+  material.roughness = 0.23f;
+  material.coat = 0.4f;
+  material.coat_roughness = 0.12f;
+  material.sheen = 0.2f;
+  material.subsurface = 0.3f;
+  material.anisotropy = -0.4f;
+
+  apply_material_preset(material, MaterialPreset::Custom);
+  const PrincipledParameters parameters = resolve_principled_parameters(material);
+
+  EXPECT_EQ(material.type, MaterialType::Surface);
+  EXPECT_FLOAT_EQ(parameters.metallic, 0.35f);
+  EXPECT_FLOAT_EQ(parameters.roughness, 0.23f);
+  EXPECT_FLOAT_EQ(parameters.coat, 0.4f);
+  EXPECT_FLOAT_EQ(parameters.coat_roughness, 0.12f);
+  EXPECT_FLOAT_EQ(parameters.sheen, 0.2f);
+  EXPECT_FLOAT_EQ(parameters.subsurface, 0.3f);
+  EXPECT_FLOAT_EQ(parameters.anisotropy, -0.4f);
+}
+
+TEST(Material, UsesConsistentSurfaceMixturePdf) {
+  Material surface;
+  const PrincipledParameters parameters = resolve_principled_parameters(surface);
+  const float diffuse_pdf = 0.25f;
+  const float specular_pdf = 0.75f;
+  const float mixture_pdf = detail::surface_mixture_pdf(parameters, diffuse_pdf, specular_pdf);
+  EXPECT_GT(detail::surface_specular_probability(parameters), 0.0f);
+  EXPECT_LT(detail::surface_specular_probability(parameters), 1.0f);
+  EXPECT_GT(mixture_pdf, diffuse_pdf);
+  EXPECT_LT(mixture_pdf, specular_pdf);
+  EXPECT_TRUE(std::isfinite(mixture_pdf));
+
+  apply_material_preset(surface, MaterialPreset::Metal);
+  const PrincipledParameters metal = resolve_principled_parameters(surface);
+  EXPECT_FLOAT_EQ(detail::surface_specular_probability(metal), 1.0f);
+  EXPECT_FLOAT_EQ(detail::surface_mixture_pdf(metal, diffuse_pdf, specular_pdf), specular_pdf);
 }
 
 TEST(Material, RejectsInvalidPhysicalParameters) {
