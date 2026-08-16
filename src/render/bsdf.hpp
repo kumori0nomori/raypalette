@@ -7,6 +7,8 @@ namespace raypalette {
 
 constexpr float kPi = 3.14159265358979323846f;
 
+// Power heuristic for multiple importance sampling (MIS)
+// to combine different sampling strategies.
 RAYPALETTE_HOST_DEVICE inline float power_heuristic(float first_pdf, float second_pdf) {
   const float first_squared = first_pdf * first_pdf;
   const float second_squared = second_pdf * second_pdf;

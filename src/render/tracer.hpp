@@ -284,13 +284,20 @@ scatter_surface_specular(const Ray& ray, const HitRecord& record,
 }
 
 struct SurfaceSample {
+  // Direction of the next ray after scattering at the surface.
   Vec3 direction;
+  // Multiplicative factor applied to the path throughput after scattering.
   Vec3 throughput_factor;
+  // PDF of the sampled direction under the mixed BSDF, used for MIS.
   float pdf = 0.0f;
+  // Random value passed to the next scattering event.
   float next_random = 0.0f;
+  // Whether the scattering distribution is a delta distribution,
+  // such as ideal specular reflection.
   bool delta = false;
 };
 
+// Determine the next ray direction and throughput factor for a surface material.
 RAYPALETTE_HOST_DEVICE inline SurfaceSample sample_surface(const Ray& ray, const HitRecord& record,
                                                            const PrincipledParameters& material,
                                                            float random_value, int bounce) {
@@ -322,13 +329,23 @@ RAYPALETTE_HOST_DEVICE inline SurfaceSample sample_surface(const Ray& ray, const
   return sample;
 }
 
+// Compute the solid-angle PDF assigned by emissive-sphere light sampling
+// to the direction from the current ray origin to its intersection point.
 RAYPALETTE_HOST_DEVICE inline float emissive_sphere_pdf(const Scene& scene, const Ray& ray,
                                                         const HitRecord& record) {
+  // cos(theta) = dot(surface_normal, -ray.direction)
   const Vec3 surface_normal = normalized(record.position - scene.sphere.center);
   const float light_cosine = fmaxf(0.0f, dot(surface_normal, -ray.direction));
+  // The area of the sphere is area = 4*pi*r^2.
   const float area = 4.0f * kPi * scene.sphere.radius * scene.sphere.radius;
   if (light_cosine <= 0.0f || area <= 0.0f)
     return 0.0f;
+
+  // Convert the area PDF to a solid-angle PDF:
+  // p_omega = p_area * distance^2 / cos(theta)
+  //          = (1 / area) * distance^2 / cos(theta)
+  // This is derived from d(area)/d(omega) = distance^2 / cos(theta),
+  // where d(omega) is the differential solid angle.
   return record.distance * record.distance / (light_cosine * area);
 }
 
@@ -368,6 +385,8 @@ RAYPALETTE_HOST_DEVICE inline Vec3 trace_color(const Scene& scene, const Ray& ra
   Vec3 path_radiance;
   float path_random = random_value;
   float previous_bsdf_pdf = 0.0f;
+  // Indicates whether the previous scattering event was a delta distribution,
+  // such as ideal reflection or refraction.
   bool previous_scatter_was_delta = true;
   for (int bounce = bounce_count;; ++bounce) {
     // Check ray intersection with the scene geometry.
@@ -384,6 +403,8 @@ RAYPALETTE_HOST_DEVICE inline Vec3 trace_color(const Scene& scene, const Ray& ra
     if (material.type == MaterialType::Emissive) {
       float emission_mis_weight = 1.0f;
       if (!previous_scatter_was_delta && record.material_index == kSphereMaterialIndex) {
+        // Compute the MIS weight for combining the previous BSDF PDF
+        // and the emissive-sphere light-sampling PDF.
         emission_mis_weight =
             power_heuristic(previous_bsdf_pdf, emissive_sphere_pdf(scene, current_ray, record));
       }
