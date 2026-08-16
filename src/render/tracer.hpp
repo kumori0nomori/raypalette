@@ -142,7 +142,7 @@ RAYPALETTE_HOST_DEVICE inline Vec3 cosine_sample_direction(const Vec3& normal, f
 
 // Return the accumulated radiance from the scene light sources and environment at the intersection
 // point for a surface material, taking into account the material properties and light sampling.
-//  L_surface = L_ambient + L_direct + L_emissive
+//  L_surface = L_ambient + L_direct + L_emissive_direct
 RAYPALETTE_HOST_DEVICE inline Vec3
 evaluate_surface_lighting(const Scene& scene, const Ray& ray, const HitRecord& record,
                           const PrincipledParameters& material, float minimum_distance,
@@ -177,13 +177,18 @@ evaluate_surface_lighting(const Scene& scene, const Ray& ray, const HitRecord& r
   // 3. Compute the direct lighting contribution from the emissive sphere in the scene.
   Vec3 emissive_direct_light;
   for (int sample_index = 0; sample_index < emissive_light_sample_count; ++sample_index) {
+    // Sample a point on the emissive sphere.
     LightSample light_sample;
     if (!try_sample_emissive_sphere(scene, record, sample_index, random_value, light_sample))
       continue;
+
+    // Check visibility to the emissive sphere and accumulate its
+    // direct-light contribution when visible.
     if (visible_to_light(scene, record, light_sample, minimum_distance)) {
       emissive_direct_light += evaluate_surface_light_sample(ray, record, material, light_sample);
     }
   }
+  // Average the direct light for samples of emissive sphere lights.
   emissive_direct_light *= 1.0f / emissive_light_sample_count;
   return ambient + direct_light + emissive_direct_light;
 }
