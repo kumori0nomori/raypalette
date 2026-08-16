@@ -36,17 +36,22 @@ RAYPALETTE_HOST_DEVICE constexpr int sample_count_to_grid_size(int sample_count)
   return sample_count >= 16 ? 4 : sample_count >= 9 ? 3 : sample_count >= 4 ? 2 : 1;
 }
 
+// Find the closest valid intersection and return whether the ray hit the scene.
 RAYPALETTE_HOST_DEVICE inline bool hit_scene(const Scene& scene, const Ray& ray,
                                              float minimum_distance, float maximum_distance,
                                              HitRecord& record) {
   bool hit_anything = false;
   float closest_distance = maximum_distance;
   HitRecord candidate;
+
+  // Check if the ray hits the sphere first.
   if (hit_sphere(scene.sphere, ray, minimum_distance, closest_distance, candidate)) {
     record = candidate;
     closest_distance = candidate.distance;
     hit_anything = true;
   }
+
+  // Replace the current hit if the plane is closer.
   if (hit_plane(scene.floor, ray, minimum_distance, closest_distance, candidate)) {
     record = candidate;
     hit_anything = true;
