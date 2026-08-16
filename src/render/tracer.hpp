@@ -327,11 +327,16 @@ RAYPALETTE_HOST_DEVICE inline float emissive_sphere_pdf(const Scene& scene, cons
   return record.distance * record.distance / (light_cosine * area);
 }
 
+// Probabilistically prune paths for efficient rendering using Russian roulette.
 RAYPALETTE_HOST_DEVICE inline bool apply_russian_roulette(Vec3& throughput, float& random_value,
                                                           int bounce) {
+  // Always continue the first 3 bounces to preserve important light paths.
   constexpr int kRouletteStartBounce = 3;
   if (bounce < kRouletteStartBounce)
     return true;
+
+  // Compute survival probability for Russian roulette from the maximum value of the throughput.
+  // Decide whether the path survives based on the survival probability.
   const float maximum_throughput = fmaxf(throughput.x, fmaxf(throughput.y, throughput.z));
   const float survival_probability = fminf(0.95f, fmaxf(0.05f, maximum_throughput));
   const bool survives = random_value < survival_probability;
@@ -342,6 +347,8 @@ RAYPALETTE_HOST_DEVICE inline bool apply_russian_roulette(Vec3& throughput, floa
       16777216.0f;
   if (!survives)
     return false;
+
+  // Scale the throughput to account for the probability of survival.
   throughput = throughput * (1.0f / survival_probability);
   return true;
 }
